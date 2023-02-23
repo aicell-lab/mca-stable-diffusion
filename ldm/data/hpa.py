@@ -212,7 +212,7 @@ class HPACombineDatasetMetadataInMemory():
         self.rotate_and_flip = rotate_and_flip
         if rotate_and_flip:
             self.preprocessor = albumentations.Compose(
-                [albumentations.Rotate(limit=180, border_mode=4, p=1, interpolation=0),
+                [albumentations.Rotate(limit=180, border_mode=cv2.BORDER_REFLECT_101, p=1.0, interpolation=cv2.INTER_NEAREST),
                 albumentations.Flip(p=0.75)])
         self.length = len(self.samples)
         assert group in ['train', 'validation']
@@ -246,9 +246,9 @@ class HPACombineDatasetMetadataInMemory():
         sample_copy = sample.copy()
         if self.rotate_and_flip:
             image, ref_image = sample["image"], sample["ref-image"]
-            image = self.preprocessor(image=image)["image"]
-            ref_image = self.preprocessor(image=ref_image)["image"]
-            sample_copy["image"], sample_copy["ref-image"] = image, ref_image
+            transformed = self.preprocessor(image=image, ref=ref_image)
+            sample_copy["image"] = transformed["image"]
+            sample_copy["ref-image"] = transformed["ref"]
         if not self.return_info:
             del sample_copy["info"] # Remove info to avoid issue in the dataloader
         return sample_copy
