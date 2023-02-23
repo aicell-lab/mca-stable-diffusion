@@ -59,7 +59,6 @@ sequences_Example = [re.sub(r"[UZOB]", "X", sequence) for sequence in sequences_
 
 ids = tokenizer.batch_encode_plus(sequences_Example, add_special_tokens=True, padding=True)
 
-print(ids.keys())
 input_ids = torch.tensor(ids['input_ids']).to(device)
 attention_mask = torch.tensor(ids['attention_mask']).to(device)
 
@@ -72,7 +71,7 @@ print(encoder_embedding.shape)
 
 url = "/data/wei/hpa-webdataset-all-composite/webdataset_info.tar"
 dataset = wds.WebDataset(url).decode().to_tuple("__key__", "info.json")
-with open("error-log-bert.txt", "w") as log:
+with open("error-log-t5.txt", "w") as log:
     with wds.TarWriter('/data/wei/hpa-webdataset-all-composite/webdataset_t5.tar') as sink:
         for idx, data in tqdm(enumerate(dataset)):
             info = data[1]
@@ -83,6 +82,7 @@ with open("error-log-bert.txt", "w") as log:
                     ids = tokenizer.batch_encode_plus([re.sub(r"[UZOB]", "X", seq)], add_special_tokens=True, padding=True, is_split_into_words=True, return_tensors="pt")
                     input_ids = ids['input_ids'].to(device)
                     # attention_mask = ids['attention_mask'].to(device)
+                    
                     with torch.no_grad():
                         embedding = model(input_ids=input_ids)
                         # compute per_protein embedding
@@ -90,8 +90,24 @@ with open("error-log-bert.txt", "w") as log:
                         t5_embedding = embedding.cpu().numpy()
                         assert t5_embedding.shape == (T5_FEATURE_LENGTH, )
                 except Exception as e:
-                    log.write(f"Failed to run bert for {info}\n")
-                    print(e, info)
+                    try:
+                        print(f"Falling back to cpu: {e}\n")
+                        model = model.to('cpu')
+                        model = model.to(torch.float32)
+                        # fallback to cpu mode
+                        with torch.no_grad():
+                            embedding = model(input_ids=input_ids.to('cpu'))
+                            # compute per_protein embedding
+                            embedding = embedding.last_hidden_state[0].mean(dim=0)
+                            t5_embedding = embedding.numpy()
+                            assert t5_embedding.shape == (T5_FEATURE_LENGTH, )
+                        model = model.to(device)
+                        if torch.cuda.is_available():
+                            model = model.half()
+                    except Exception as exp:
+                        log.write(f"Failed to run t5 for {info}\n")
+                        print(e, info)
+                        break
             else:
                 t5_embedding = np.zeros([T5_FEATURE_LENGTH], dtype='float32')
             sink.write({
