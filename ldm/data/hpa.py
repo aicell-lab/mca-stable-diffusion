@@ -213,7 +213,7 @@ class HPACombineDatasetMetadataInMemory():
         if rotate_and_flip:
             self.preprocessor = albumentations.Compose(
                 [albumentations.Rotate(limit=180, border_mode=cv2.BORDER_REFLECT_101, p=1.0, interpolation=cv2.INTER_NEAREST),
-                albumentations.Flip(p=0.75)])
+                albumentations.HorizontalFlip(p=0.5)])
         self.length = len(self.samples)
         assert group in ['train', 'validation']
         assert train_split < 1 and train_split > 0
@@ -231,7 +231,7 @@ class HPACombineDatasetMetadataInMemory():
         return len(self.indexes)
 
     def __getitem__(self, i):
-        sample = self.samples[self.indexes[i]]
+        sample = self.samples[self.indexes[i]].copy()
         if self.channels:
             sample['image'] = sample['image'][:, :, self.channels]
         info = sample["info"]
@@ -243,15 +243,15 @@ class HPACombineDatasetMetadataInMemory():
             locations_encoding = np.zeros((len(location_mapping) + 1, ), dtype=np.float32)
             locations_encoding[loc_labels] = 1
             sample["location_classes"] = locations_encoding
-        sample_copy = sample.copy()
         if self.rotate_and_flip:
-            image, ref_image = sample["image"], sample["ref-image"]
-            transformed = self.preprocessor(image=image, ref=ref_image)
-            sample_copy["image"] = transformed["image"]
-            sample_copy["ref-image"] = transformed["ref"]
+            # make sure the pixel values should be [0, 1], but the sample image is ranging from -1 to 1
+            transformed = self.preprocessor(image=(sample["image"]+1)/2, mask=(sample["ref-image"]+1)/2)
+            # restore the range from [0, 1] to [-1, 1]
+            sample["image"] = transformed["image"]*2 -1
+            sample["ref-image"] = transformed["mask"]*2 -1
         if not self.return_info:
-            del sample_copy["info"] # Remove info to avoid issue in the dataloader
-        return sample_copy
+            del sample["info"] # Remove info to avoid issue in the dataloader
+        return sample
 
 
 class HPACombineDatasetSR(Dataset):
