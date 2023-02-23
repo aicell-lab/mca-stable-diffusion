@@ -58,6 +58,21 @@
             "justMyCode": true
         },
         {
+            "name": "Train: hpa-ldm-vq-4-hybrid-protein-augmentation",
+            "type": "python",
+            "request": "launch",
+            "program": "main.py",
+            "args": [
+                "-t",
+                "-b",
+                "configs/latent-diffusion/hpa-ldm-vq-4-hybrid-protein-augmentation-debug.yaml",
+                "--gpus=0,1,2,3",
+                "--scale_lr=False"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
             "name": "Train-cpu: hpa-ldm-vq-4-hybrid",
             "type": "python",
             "request": "launch",
