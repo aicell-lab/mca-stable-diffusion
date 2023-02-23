@@ -171,7 +171,7 @@ class HPACombineDatasetMetadataInMemory():
         with open(cache_file, 'wb') as fp:
             pickle.dump(samples, fp)
 
-    def __init__(self, cache_file, seed=123, train_split=0.95, group='train', channels=None, include_location=False, return_info=False, filter_func=None, dump_to_file=None):
+    def __init__(self, cache_file, seed=123, train_split=0.95, group='train', channels=None, include_location=False, return_info=False, filter_func=None, dump_to_file=None, rotate_and_flip=False):
         if cache_file in HPACombineDatasetMetadataInMemory.samples_dict:
             self.samples = HPACombineDatasetMetadataInMemory.samples_dict[cache_file]
         else:
@@ -209,6 +209,11 @@ class HPACombineDatasetMetadataInMemory():
 
         self.include_location = include_location
         self.return_info = return_info
+        self.rotate_and_flip = rotate_and_flip
+        if rotate_and_flip:
+            self.preprocessor = albumentations.Compose(
+                [albumentations.Rotate(limit=180, border_mode=cv2.BORDER_REFLECT_101, p=1.0, interpolation=cv2.INTER_NEAREST),
+                albumentations.HorizontalFlip(p=0.5)])
         self.length = len(self.samples)
         assert group in ['train', 'validation']
         assert train_split < 1 and train_split > 0
@@ -226,7 +231,7 @@ class HPACombineDatasetMetadataInMemory():
         return len(self.indexes)
 
     def __getitem__(self, i):
-        sample = self.samples[self.indexes[i]]
+        sample = self.samples[self.indexes[i]].copy()
         if self.channels:
             sample['image'] = sample['image'][:, :, self.channels]
         info = sample["info"]
@@ -238,6 +243,12 @@ class HPACombineDatasetMetadataInMemory():
             locations_encoding = np.zeros((len(location_mapping) + 1, ), dtype=np.float32)
             locations_encoding[loc_labels] = 1
             sample["location_classes"] = locations_encoding
+        if self.rotate_and_flip:
+            # make sure the pixel values should be [0, 1], but the sample image is ranging from -1 to 1
+            transformed = self.preprocessor(image=(sample["image"]+1)/2, mask=(sample["ref-image"]+1)/2)
+            # restore the range from [0, 1] to [-1, 1]
+            sample["image"] = transformed["image"]*2 -1
+            sample["ref-image"] = transformed["mask"]*2 -1
         if not self.return_info:
             del sample["info"] # Remove info to avoid issue in the dataloader
         return sample
@@ -398,6 +409,5 @@ class HPAHybridEmbedder(nn.Module):
 if __name__ == "__main__":
     HPACombineDatasetMetadataInMemory(seed=123, train_split=0.95, group='train', cache_file=f"{HPA_DATA_ROOT}/HPACombineDatasetMetadataInMemory-256.pickle", channels= [1, 1, 1],
         filter_func="has_location", dump_to_file=f"{HPA_DATA_ROOT}/HPACombineDatasetMetadataInMemory-256-has-location.pickle")
-    # HPACombineDatasetMetadataInMemory.generate_cache(f"{HPA_DATA_ROOT}/HPACombineDatasetMetadataInMemory-256-1000.pickle", size=256, total_length=1000)
     # HPACombineDatasetMetadataInMemory.generate_cache(f"{HPA_DATA_ROOT}/HPACombineDatasetMetadataInMemory-256.pickle", size=256)
     # dump_info(f"{HPA_DATA_ROOT}/HPACombineDatasetInfo.pickle")
