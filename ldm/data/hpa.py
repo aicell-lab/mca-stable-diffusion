@@ -175,7 +175,7 @@ class HPACombineDatasetMetadataInMemory():
         with open(cache_file, 'wb') as fp:
             pickle.dump(samples, fp)
 
-    def __init__(self, cache_file, seed=123, train_split=0.95, group='train', channels=None, include_location=False, return_info=False, filter_func=None, dump_to_file=None, rotate_and_flip=False):
+    def __init__(self, cache_file, seed=123, train_split=0.95, group='train', channels=None, include_location=False, return_info=False, filter_func=None, dump_to_file=None, rotate_and_flip=False, data_split_indices=None):
         if cache_file in HPACombineDatasetMetadataInMemory.samples_dict:
             self.samples = HPACombineDatasetMetadataInMemory.samples_dict[cache_file]
         else:
@@ -197,7 +197,7 @@ class HPACombineDatasetMetadataInMemory():
                 raise Exception(f"Cache file not found {cache_file}")
             HPACombineDatasetMetadataInMemory.samples_dict[cache_file] = self.samples
         
-        if filter_func:
+        if filter_func and data_split_indices is None:
             if filter_func == 'has_location':
                 filter_func = lambda x: int( x['info']['status']) == 35 and x['info']['Ab state'] == 'IF_FINISHED' and str(x['info']['locations']) != "nan"
 
@@ -220,15 +220,20 @@ class HPACombineDatasetMetadataInMemory():
                 albumentations.HorizontalFlip(p=0.5)])
         self.length = len(self.samples)
         assert group in ['train', 'validation']
-        assert train_split < 1 and train_split > 0
-        random.seed(seed)
-        indexes = list(range(self.length))
-        random.shuffle(indexes)
-        size = int(train_split * self.length)
-        if group == 'train':
-            self.indexes = indexes[:size]
+        if data_split_indices is None:
+            assert train_split < 1 and train_split > 0
+            random.seed(seed)
+            indexes = list(range(self.length))
+            random.shuffle(indexes)
+            size = int(train_split * self.length)
+            if group == 'train':
+                self.indexes = indexes[:size]
+            else:
+                self.indexes = indexes[size:]
         else:
-            self.indexes = indexes[size:]
+            with open(data_split_indices, "rb") as in_file:
+                idcs = pickle.load(in_file)
+            self.indexes = list(filter(lambda i: i < self.length, idcs[group]))
         print(f"Dataset group: {group}, length: {len(self.indexes)}, image channels: {self.channels or [0, 1, 2]}")
 
     def __len__(self):
