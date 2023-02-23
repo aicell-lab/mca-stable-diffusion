@@ -27,7 +27,7 @@ except:
 HPA_DATA_ROOT = os.environ.get("HPA_DATA_ROOT", "/data/wei/hpa-webdataset-all-composite")
 
 class HPACombineDataset(Dataset):
-    def __init__(self, filename, include_metadata=False, length=80000):
+    def __init__(self, filename, include_metadata=False, length=80000, protein_embedding="bert"):
         super().__init__()
         self.include_metadata = include_metadata
         assert not filename.endswith(".tar")
@@ -43,8 +43,12 @@ class HPACombineDataset(Dataset):
             url = f"{HPA_DATA_ROOT}/{filename}_info.tar"
             dataset2 = wds.WebDataset(url, nodesplitter=wds.split_by_node).decode().to_tuple("__key__", "info.json")
             
-            url = f"{HPA_DATA_ROOT}/{filename}_bert.tar"
-            dataset3 = wds.WebDataset(url, nodesplitter=wds.split_by_node).decode().to_tuple("__key__", "bert.pyd")
+            if protein_embedding == "bert":
+                url = f"{HPA_DATA_ROOT}/{filename}_bert.tar"
+                dataset3 = wds.WebDataset(url, nodesplitter=wds.split_by_node).decode().to_tuple("__key__", "bert.pyd")
+            else:
+                url = f"{HPA_DATA_ROOT}/{filename}_t5.tar"
+                dataset3 = wds.WebDataset(url, nodesplitter=wds.split_by_node).decode().to_tuple("__key__", "t5.pyd")
 
             self.dataset_iter = iter(zip(dataset1, dataset2, dataset3))
         
@@ -61,9 +65,9 @@ class HPACombineDataset(Dataset):
                 imgd = ret[0]
                 yield {"file_path_": imgd[0], "image": imgd[1]}
             else:
-                imgd, infod, bertd = ret
-                assert imgd[0] == infod[0] and imgd[0] == bertd[0]
-                yield {"file_path_": imgd[0], "image": imgd[1], "info": infod[1], "bert": bertd[1]}
+                imgd, infod, embedd = ret
+                assert imgd[0] == infod[0] and imgd[0] == embedd[0]
+                yield {"file_path_": imgd[0], "image": imgd[1], "info": infod[1], "embed": embedd[1]}
 
 
     def __getitem__(self, i):
@@ -74,10 +78,10 @@ location_mapping = {"Actin filaments": 0, "Aggresome": 1, "Cell Junctions": 2, "
 cellline_mapping = {"A-431": 0, "A549": 1, "AF22": 2, "ASC TERT1": 3, "BJ": 4, "CACO-2": 5, "EFO-21": 6, "HAP1": 7, "HDLM-2": 8, "HEK 293": 9, "HEL": 10, "HTC": 11, "HUVEC TERT2": 12, "HaCaT": 13, "HeLa": 14, "Hep G2": 15, "JURKAT": 16, "K-562": 17, "LHCN-M2": 18, "MCF7": 19, "NB-4": 20, "NIH 3T3": 21, "OE19": 22, "PC-3": 23, "REH": 24, "RH-30": 25, "RPTEC TERT1": 26, "RT4": 27, "SH-SY5Y": 28, "SK-MEL-30": 29, "SiHa": 30, "SuSa": 31, "THP-1": 32, "U-2 OS": 33, "U-251 MG": 34, "Vero": 35, "hTCEpi": 36}
 
 class HPACombineDatasetMetadata():
-    def __init__(self, filename="webdataset", channels=None, include_metadata=True, return_info=False, size=None, length=80000, random_crop=False):
+    def __init__(self, filename="webdataset", channels=None, include_metadata=True, return_info=False, size=None, length=80000, random_crop=False, protein_embedding="bert"):
         self.size = size
         self.random_crop = random_crop
-        self.base = HPACombineDataset(filename, include_metadata=include_metadata, length=length)
+        self.base = HPACombineDataset(filename, include_metadata=include_metadata, length=length, protein_embedding=protein_embedding)
         if self.size is not None and self.size > 0:
             self.rescaler = albumentations.SmallestMaxSize(max_size = self.size)
             if not self.random_crop:
@@ -110,7 +114,7 @@ class HPACombineDatasetMetadata():
         all_channels = example["image"]
         image = all_channels[:, :, self.channels]
         info = example["info"]
-        bert = example["bert"]
+        embed = example["embed"]
         ref = all_channels[:, :, [0, 3, 2]] # reference channels: MT, ER, DAPI
 
         # loc_labels = list(map(lambda n: location_mapping[n] if n in location_mapping else -1, str(info["locations"]).split(',')))
@@ -127,7 +131,7 @@ class HPACombineDatasetMetadata():
             # "class_label": locations_encoding,
             "cell-line": cellline_encoding,
             "ref-image": self.preprocess_image(ref),
-            "bert": bert,
+            "embed": embed,
             "condition_caption": f"{info['gene_names']}/{info['atlas_name']}",
             "location_caption": f"{info['locations']}",
         }
@@ -263,7 +267,7 @@ class HPACombineDatasetMetadataInMemory():
 class HPACombineDatasetSR(Dataset):
     def __init__(self, filename, size=None, length=80000, channels=None,
                  degradation=None, downscale_f=4, min_crop_f=0.5, max_crop_f=1.,
-                 random_crop=True):
+                 random_crop=True, protein_embedding="bert"):
         """
         Imagenet Superresolution Dataloader
         Performs following ops in order:
@@ -284,7 +288,7 @@ class HPACombineDatasetSR(Dataset):
             self.channels = [0, 1, 2]
         else:
             self.channels = channels
-        self.base = HPACombineDataset(filename, include_metadata=False, length=length)
+        self.base = HPACombineDataset(filename, include_metadata=False, length=length, protein_embedding=protein_embedding)
         assert size
         assert (size / downscale_f).is_integer()
         self.size = size
@@ -369,9 +373,9 @@ class HPAClassEmbedder(nn.Module):
         self.include_location = include_location
 
     def forward(self, batch, key=None):
-        bert = batch["bert"]
+        embed = batch["embed"]
         celline = batch["cell-line"]
-        embed = [bert, celline]
+        embed = [embed, celline]
         if self.include_location:
             embed.append(batch["location_classes"])
         return {"c_crossattn": embed}
@@ -392,9 +396,9 @@ class HPAHybridEmbedder(nn.Module):
             img_embed = self.image_embedding_model.encode(image)
         if torch.any(torch.isnan(img_embed)):
             raise Exception("NAN values encountered in the image embedding")
-        bert = batch["bert"]
+        embed = batch["embed"]
         celline = batch["cell-line"]
-        cross_embed = [bert, celline]
+        cross_embed = [embed, celline]
         if self.include_location:
             cross_embed.append(batch["location_classes"])
         return {"c_concat": [img_embed], "c_crossattn": cross_embed}
@@ -413,7 +417,9 @@ class HPAHybridEmbedder(nn.Module):
 
 
 if __name__ == "__main__":
-    HPACombineDatasetMetadataInMemory(seed=123, train_split=0.95, group='train', cache_file=f"{HPA_DATA_ROOT}/HPACombineDatasetMetadataInMemory-256.pickle", channels= [1, 1, 1],
-        filter_func="has_location", dump_to_file=f"{HPA_DATA_ROOT}/HPACombineDatasetMetadataInMemory-256-has-location.pickle")
-    # HPACombineDatasetMetadataInMemory.generate_cache(f"{HPA_DATA_ROOT}/HPACombineDatasetMetadataInMemory-256.pickle", size=256)
+    # HPACombineDatasetMetadataInMemory(seed=123, train_split=0.95, group='train', cache_file=f"{HPA_DATA_ROOT}/HPACombineDatasetMetadataInMemory-256.pickle", channels= [1, 1, 1],
+    #     filter_func="has_location", dump_to_file=f"{HPA_DATA_ROOT}/HPACombineDatasetMetadataInMemory-256-has-location.pickle")
+    # HPACombineDatasetMetadataInMemory.generate_cache(f"{HPA_DATA_ROOT}/HPACombineDatasetMetadataInMemory-256-1000.pickle", size=256, total_length=1000)
+    HPACombineDatasetMetadataInMemory.generate_cache(f"{HPA_DATA_ROOT}/HPACombineDatasetMetadataInMemory-256-1000-t5.pickle", size=256, total_length=1000, protein_embedding="t5")
+    # HPACombineDatasetMetadataInMemory.generate_cache(f"{HPA_DATA_ROOT}/HPACombineDatasetMetadataInMemory-256-t5.pickle", size=256, protein_embedding="t5")
     # dump_info(f"{HPA_DATA_ROOT}/HPACombineDatasetInfo.pickle")
