@@ -23,8 +23,7 @@ try:
 except:
    import pickle
 
-HPA_DATA_ROOT = "/data/wei/hpa-webdataset-all-composite"
-HPA_WRITE_ROOT = os.environ.get("HPA_WRITE_ROOT", "/data/xikunz/hpa-webdataset-all-composite")
+HPA_DATA_ROOT = os.environ.get("HPA_DATA_ROOT", "/data/wei/hpa-webdataset-all-composite")
 
 class HPACombineDataset(Dataset):
     def __init__(self, filename, include_metadata=False, length=80000):
@@ -408,10 +407,6 @@ class HPAHybridEmbedder(nn.Module):
 
 
 if __name__ == "__main__":
-    # HPACombineDatasetMetadataInMemory(seed=123, train_split=0.95, group='train', cache_file=f"{HPA_DATA_ROOT}/HPACombineDatasetMetadataInMemory-256.pickle", channels= [1, 1, 1],
-        # filter_func="has_location", dump_to_file=f"{HPA_DATA_ROOT}/HPACombineDatasetMetadataInMemory-256-has-location.pickle")
-    # HPACombineDatasetMetadataInMemory.generate_cache(f"{HPA_WRITE_ROOT}/HPACombineDatasetMetadataInMemory-256-1000.pickle", size=256, total_length=1000)
-    # HPACombineDatasetMetadataInMemory.generate_cache(f"{HPA_WRITE_ROOT}/HPACombineDatasetMetadataInMemory-256-1000-rotate.pickle", size=256, total_length=1000, rotate_and_flip=True)
-    # HPACombineDatasetMetadataInMemory.generate_cache(f"{HPA_DATA_ROOT}/HPACombineDatasetMetadataInMemory-256.pickle", size=256)
-    HPACombineDatasetMetadataInMemory.generate_cache(f"{HPA_WRITE_ROOT}/HPACombineDatasetMetadataInMemory-256-rotate.pickle", size=256, rotate_and_flip=True)
-    # dump_info(f"{HPA_DATA_ROOT}/HPACombineDatasetInfo.pickle")
+    HPACombineDatasetMetadataInMemory(seed=123, train_split=0.95, group='train', cache_file=f"{HPA_DATA_ROOT}/HPACombineDatasetMetadataInMemory-256.pickle", channels= [1, 1, 1],
+        filter_func="has_location", dump_to_file=f"{HPA_DATA_ROOT}/HPACombineDatasetMetadataInMemory-256-has-location.pickle")
+    # HPACombineDatasetMetadataInMemory.generate_cache(f"{HPA_DATA_ROOT}/HPACombineDatasetMetadataInMemory-256-1000.pickle", size=256, total_length=1000)
