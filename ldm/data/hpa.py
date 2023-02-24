@@ -17,6 +17,7 @@ from functools import partial
 from einops import rearrange
 from ldm.util import instantiate_from_config
 from torchvision.utils import make_grid
+import json
 
 try:
    import cPickle as pickle
@@ -231,8 +232,8 @@ class HPACombineDatasetMetadataInMemory():
             else:
                 self.indexes = indexes[size:]
         else:
-            with open(data_split_indices, "rb") as in_file:
-                idcs = pickle.load(in_file)
+            with open(data_split_indices, "r") as in_file:
+                idcs = json.load(in_file)
             self.indexes = list(filter(lambda i: i < self.length, idcs[group]))
         print(f"Dataset group: {group}, length: {len(self.indexes)}, image channels: {self.channels or [0, 1, 2]}")
 
