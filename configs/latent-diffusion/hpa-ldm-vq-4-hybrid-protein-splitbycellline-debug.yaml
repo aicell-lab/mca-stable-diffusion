@@ -49,7 +49,7 @@ model:
         embed_dim: 3
         n_embed: 8192
         # autoencoder for the reference + protein channel
-        ckpt_path: /data/wei/stable-diffusion-logs/2022-11-06T04-05-25_autoencoder_vq_f4_hpa_p/checkpoints/last.ckpt
+        ckpt_path: /data/xikunz/logs/2022-11-06T04-05-25_autoencoder_vq_f4_hpa_p/checkpoints/last.ckpt
         ddconfig:
           double_z: false
           z_channels: 3
@@ -76,7 +76,7 @@ model:
             embed_dim: 3
             n_embed: 8192
             # autoencoder for the reference channel
-            ckpt_path: /data/wei/stable-diffusion-logs/2022-10-14T09-02-57_autoencoder_vq_f4_hpa_r/checkpoints/last.ckpt
+            ckpt_path: /data/xikunz/logs/2022-10-14T09-02-57_autoencoder_vq_f4_hpa_r/checkpoints/last.ckpt
             ddconfig:
               double_z: false
               z_channels: 3
@@ -98,7 +98,7 @@ model:
 data:
   target: main.DataModuleFromConfig
   params:
-    batch_size: 64
+    batch_size: 8
     num_workers: 16
     wrap: False
     # train:
@@ -117,33 +117,33 @@ data:
       target: ldm.data.hpa.HPACombineDatasetMetadataInMemory
       params:
         seed: 123
-        train_split: 0.95
+        train_split_ratio: null
         group: 'train'
-        cache_file: /data/wei/hpa-webdataset-all-composite/HPACombineDatasetMetadataInMemory-256.pickle
+        cache_file: /data/wei/hpa-webdataset-all-composite/HPACombineDatasetMetadataInMemory-256-1000.pickle
         channels: [1, 1, 1]
-        data_split_indices: /data/wei/hpa-webdataset-all-composite/stage1_data_split.json
+        split_by_indexes: /data/wei/hpa-webdataset-all-composite/stage1_data_split.json
     validation:
       target: ldm.data.hpa.HPACombineDatasetMetadataInMemory
       params:
         seed: 123
-        train_split: 0.95
+        train_split_ratio: null
         group: 'validation'
-        cache_file: /data/wei/hpa-webdataset-all-composite/HPACombineDatasetMetadataInMemory-256.pickle
+        cache_file: /data/wei/hpa-webdataset-all-composite/HPACombineDatasetMetadataInMemory-256-1000.pickle
         channels: [1, 1, 1]
-        data_split_indices: /data/wei/hpa-webdataset-all-composite/stage1_data_split.json
+        split_by_indexes: /data/wei/hpa-webdataset-all-composite/stage1_data_split.json
 
 lightning:
   callbacks:
     image_logger:
       target: main.ImageLogger
       params:
-        batch_frequency: 4000
+        batch_frequency: 1000
         log_validation: true
-        val_batch_frequency: 4000
+        val_batch_frequency: 1000
         monitor_val_metric: "val/loss_simple_ema"
         max_images: 8
         increase_log_steps: false
-        log_to_slack: ["combined"]
+        log_to_slack: []
         log_images_kwargs:
           ddim_steps: 100
           quantize_denoised: false
@@ -157,6 +157,6 @@ lightning:
           n_row: 8
 
   trainer:
-    val_check_interval: 1.0
+    val_check_interval: 10
     benchmark: True
     accelerator: dp # need to change to dp because the default ddp will free the training

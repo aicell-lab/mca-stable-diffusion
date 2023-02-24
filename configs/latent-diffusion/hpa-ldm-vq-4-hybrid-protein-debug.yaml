@@ -117,7 +117,7 @@ data:
       target: ldm.data.hpa.HPACombineDatasetMetadataInMemory
       params:
         seed: 123
-        train_split: 0.95
+        train_split_ratio: 0.95
         group: 'train'
         cache_file: /data/wei/hpa-webdataset-all-composite/HPACombineDatasetMetadataInMemory-256-1000.pickle
         channels: [1, 1, 1]
@@ -126,7 +126,7 @@ data:
       target: ldm.data.hpa.HPACombineDatasetMetadataInMemory
       params:
         seed: 123
-        train_split: 0.95
+        train_split_ratio: 0.95
         group: 'validation'
         cache_file: /data/wei/hpa-webdataset-all-composite/HPACombineDatasetMetadataInMemory-256-1000.pickle
         channels: [1, 1, 1]
