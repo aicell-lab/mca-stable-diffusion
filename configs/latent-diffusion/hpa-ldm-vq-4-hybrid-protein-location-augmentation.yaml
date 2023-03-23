@@ -120,7 +120,7 @@ data:
         seed: 123
         group: 'train'
         train_split_ratio: null
-        cache_file: /data/wei/hpa-webdataset-all-composite/HPACombineDatasetMetadataInMemory-256-1000-t5.pickle
+        cache_file: /data/wei/hpa-webdataset-all-composite/HPACombineDatasetMetadataInMemory-256-t5.pickle
         channels: [1, 1, 1]
         filter_func: has_location
         rotate_and_flip: true
@@ -132,7 +132,7 @@ data:
         seed: 123
         group: 'validation'
         train_split_ratio: null
-        cache_file: /data/wei/hpa-webdataset-all-composite/HPACombineDatasetMetadataInMemory-256-1000-t5.pickle
+        cache_file: /data/wei/hpa-webdataset-all-composite/HPACombineDatasetMetadataInMemory-256-t5.pickle
         channels: [1, 1, 1]
         filter_func: has_location
         include_location: true
