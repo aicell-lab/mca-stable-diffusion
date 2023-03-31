@@ -119,7 +119,7 @@ class HPACombineDatasetMetadata():
 
         # loc_labels = list(map(lambda n: location_mapping[n] if n in location_mapping else -1, str(info["locations"]).split(',')))
         # create one-hot encoding for the labels
-        # locations_encoding = np.zeros((len(location_mapping) + 1, ), dtype=np.float32)
+        # locations_encoding = np.zeros((len(location_mapping), ), dtype=np.float32)
         # locations_encoding[loc_labels] = 1
         
         # create one-hot encoding for the cell line
@@ -251,7 +251,7 @@ class HPACombineDatasetMetadataInMemory():
         if self.include_location:
             loc_labels = list(map(lambda n: location_mapping[n] if n in location_mapping else -1, str(info["locations"]).split(',')))
             # create one-hot encoding for the labels
-            locations_encoding = np.zeros((len(location_mapping) + 1, ), dtype=np.float32)
+            locations_encoding = np.zeros((len(location_mapping), ), dtype=np.float32)
             locations_encoding[loc_labels] = 1
             sample["location_classes"] = locations_encoding
         if self.rotate_and_flip:
@@ -369,17 +369,68 @@ class HPACombineDatasetSR(Dataset):
         return example
     
 
-class HPAClassEmbedder(nn.Module):
-    def __init__(self, include_location=False):
-        self.include_location = include_location
+class ClassEmbedder(nn.Module):
+    def __init__(self, embed_dim, n_classes=1000, key='class'):
+        super().__init__()
+        self.key = key
+        self.embedding = nn.Embedding(n_classes, embed_dim)
 
     def forward(self, batch, key=None):
-        embed = batch["embed"]
-        celline = batch["cell-line"]
-        embed = [embed, celline]
+        if key is None:
+            key = self.key
+        # this is for use in crossattn
+        c = batch[key][:, None]
+        c = self.embedding(c)
+        return c
+
+class HPAClassEmbedder(nn.Module):
+    def __init__(self, include_location=False, include_ref_image=False, include_cellline=True, include_embed=False, image_embedding_model=None):
+        super().__init__()
+        self.include_location = include_location
+        self.include_ref_image = include_ref_image
+        self.include_embed = include_embed
+        self.include_cellline = include_cellline
+        self.loc_embedding = nn.Sequential(
+            nn.Linear(len(location_mapping.keys()), 128),
+            nn.ReLU(),
+            nn.Linear(128, 128),
+        )
+        
+        if image_embedding_model:
+            assert not isinstance(image_embedding_model, dict)
+            self.image_embedding_model = instantiate_from_config(image_embedding_model)
+
+    def forward(self, batch, key=None):
+        embed = []
+        if self.include_cellline:
+            embed.append(batch["cell-line"])
+        if self.include_embed:
+            embed.append(batch["embed"])
         if self.include_location:
-            embed.append(batch["location_classes"])
+            embeder = self.loc_embedding.to(batch["location_classes"].device)
+            embed.append(embeder(batch["location_classes"]))
+        if self.include_ref_image:
+            image = batch["ref-image"]
+            assert image.shape[3] == 3
+            image = rearrange(image, 'b h w c -> b c h w').contiguous()
+            with torch.no_grad():
+                img_embed = self.image_embedding_model.encode(image)
+            if torch.any(torch.isnan(img_embed)):
+                raise Exception("NAN values encountered in the image embedding")
+            return {"c_concat": [img_embed], "c_crossattn": embed}
         return {"c_crossattn": embed}
+
+    def decode(self, c):
+        condition_row = c['c_concat']
+        assert len(condition_row) == 1
+        with torch.no_grad():
+            condition_rec_row = [self.image_embedding_model.decode(cond) for cond in condition_row]
+        n_imgs_per_row = len(condition_rec_row)
+        condition_rec_row = torch.stack(condition_rec_row)  # n_log_step, n_row, C, H, W
+        condition_grid = rearrange(condition_rec_row, 'n b c h w -> b n c h w')
+        condition_grid = rearrange(condition_grid, 'b n c h w -> (b n) c h w')
+        condition_grid = make_grid(condition_grid, nrow=n_imgs_per_row)
+        return condition_grid
 
 
 class HPAHybridEmbedder(nn.Module):

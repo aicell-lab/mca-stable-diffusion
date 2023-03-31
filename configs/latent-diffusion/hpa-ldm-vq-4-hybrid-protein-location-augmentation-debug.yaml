@@ -2,7 +2,7 @@ model:
   base_learning_rate: 5.0e-5   # set to target_lr by starting main.py with '--scale_lr False'
   target: ldm.models.diffusion.ddpm.LatentDiffusion
   params:
-    ckpt_path: null
+    ckpt_path: /home/wei.ouyang/workspace/stable-diffusion/logs/2023-03-29T21-49-46_hpa-ldm-vq-4-hybrid-protein-location-augmentation/checkpoints/last.ckpt
     linear_start: 0.0015
     linear_end: 0.0155
     num_timesteps_cond: 1
@@ -13,7 +13,7 @@ model:
     cond_stage_key: "hybrid-conditions" # the key in the dataset for feeding into the condition model
     image_size: 64
     channels: 3
-    cond_stage_trainable: false
+    cond_stage_trainable: true
     concat_mode: false # this will set conditioning_key to "crossattn" if not exists
     conditioning_key: hybrid # force it to conditioning_key to be "hybrid"
     # scale_by_std: true
@@ -68,9 +68,12 @@ model:
           target: torch.nn.Identity
 
     cond_stage_config:
-      target: ldm.data.hpa.HPAHybridEmbedder
+      target: ldm.data.hpa.HPAClassEmbedder
       params:
         include_location: true
+        include_ref_image: true
+        include_cellline: false
+        include_embed: false
         image_embedding_model:
           target: ldm.models.autoencoder.VQModelInterface
           params:
@@ -94,7 +97,6 @@ model:
               dropout: 0.0
             lossconfig:
               target: torch.nn.Identity
-
 
 data:
   target: main.DataModuleFromConfig
@@ -150,7 +152,7 @@ lightning:
         increase_log_steps: false
         log_to_slack: []
         log_images_kwargs:
-          ddim_steps: 100
+          ddim_steps: null
           quantize_denoised: false
           inpaint: false
           plot_denoise_rows: true

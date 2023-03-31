@@ -13,7 +13,7 @@ model:
     cond_stage_key: "hybrid-conditions" # the key in the dataset for feeding into the condition model
     image_size: 64
     channels: 3
-    cond_stage_trainable: false
+    cond_stage_trainable: true
     concat_mode: false # this will set conditioning_key to "crossattn" if not exists
     conditioning_key: hybrid # force it to conditioning_key to be "hybrid"
     # scale_by_std: true
@@ -68,9 +68,12 @@ model:
           target: torch.nn.Identity
 
     cond_stage_config:
-      target: ldm.data.hpa.HPAHybridEmbedder
+      target: ldm.data.hpa.HPAClassEmbedder
       params:
         include_location: true
+        include_ref_image: true
+        include_cellline: false
+        include_embed: false
         image_embedding_model:
           target: ldm.models.autoencoder.VQModelInterface
           params:

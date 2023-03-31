@@ -1202,7 +1202,7 @@ class LatentDiffusion(DDPM):
         else:
             img = x_T
 
-        intermediates = [img]
+        pred_x0 = [img]
         if timesteps is None:
             timesteps = self.num_timesteps
 
@@ -1230,12 +1230,13 @@ class LatentDiffusion(DDPM):
                 img = img_orig * mask + (1. - mask) * img
 
             if i % log_every_t == 0 or i == timesteps - 1:
-                intermediates.append(img)
+                pred_x0.append(img)
             if callback: callback(i)
             if img_callback: img_callback(img, i)
 
+
         if return_intermediates:
-            return img, intermediates
+            return img, {'pred_x0': pred_x0}
         return img
 
     @torch.no_grad()
