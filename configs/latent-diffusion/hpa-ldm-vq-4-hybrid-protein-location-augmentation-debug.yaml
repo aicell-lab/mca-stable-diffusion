@@ -2,7 +2,7 @@ model:
   base_learning_rate: 5.0e-5   # set to target_lr by starting main.py with '--scale_lr False'
   target: ldm.models.diffusion.ddpm.LatentDiffusion
   params:
-    ckpt_path: /home/wei.ouyang/workspace/stable-diffusion/logs/2023-03-29T21-49-46_hpa-ldm-vq-4-hybrid-protein-location-augmentation/checkpoints/last.ckpt
+    ckpt_path: null
     linear_start: 0.0015
     linear_end: 0.0155
     num_timesteps_cond: 1
@@ -16,6 +16,7 @@ model:
     cond_stage_trainable: true
     concat_mode: false # this will set conditioning_key to "crossattn" if not exists
     conditioning_key: hybrid # force it to conditioning_key to be "hybrid"
+    cond_dropout: 0.1 # dropout conditions for class-conditioned model
     # scale_by_std: true
     scale_factor: 0.18215
     monitor: 'val/loss_simple_ema'
@@ -38,10 +39,12 @@ model:
         model_channels: 192
         attention_resolutions: [ 1, 2, 4, 8 ]   # 32, 16, 8, 4
         num_res_blocks: 2
-        channel_mult: [ 1,2,2,4,4 ]  # 32, 16, 8, 4, 2
+        channel_mult: [ 1, 2, 2, 4, 4 ]  # 32, 16, 8, 4, 2
         num_heads: 8
         use_scale_shift_norm: True
         resblock_updown: True
+        use_spatial_transformer: True
+        context_dim: 128
 
     first_stage_config:
       target: ldm.models.autoencoder.VQModelInterface
@@ -152,9 +155,10 @@ lightning:
         increase_log_steps: false
         log_to_slack: []
         log_images_kwargs:
-          ddim_steps: null
+          ddim_steps: 200
           quantize_denoised: false
           inpaint: false
+          unconditional_guidance_scale: 3.0
           plot_denoise_rows: true
           plot_progressive_rows: false
           plot_diffusion_rows: false

@@ -108,7 +108,7 @@ if __name__ == "__main__":
 
     config = OmegaConf.load("/home/wei.ouyang/workspace/stable-diffusion/configs/latent-diffusion/hpa-ldm-vq-4-hybrid-protein-location-augmentation-debug.yaml")
     model = instantiate_from_config(config.model)
-    model.load_state_dict(torch.load("/home/wei.ouyang/workspace/stable-diffusion/logs/2023-03-29T21-49-46_hpa-ldm-vq-4-hybrid-protein-location-augmentation/checkpoints/last.ckpt")["state_dict"],
+    model.load_state_dict(torch.load("/home/wei.ouyang/workspace/stable-diffusion/logs/2023-03-31T21-01-17_hpa-ldm-vq-4-hybrid-protein-location-augmentation-debug/checkpoints/epoch=000004.ckpt")["state_dict"],
                           strict=False)
 
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -132,15 +132,15 @@ if __name__ == "__main__":
 
                 # encode masked image and concat downsampled mask
                 c = model.cond_stage_model(sample)
-                # uc = {'c_concat': [torch.zeros_like(v) for v in c['c_concat']], 'c_crossattn': [torch.zeros_like(v) for v in c['c_crossattn']]} #
+                uc = {'c_concat': [torch.zeros_like(v) for v in c['c_concat']], 'c_crossattn': [torch.zeros_like(v) for v in c['c_crossattn']]} #
 
                 shape = (c['c_concat'][0].shape[1],)+c['c_concat'][0].shape[2:]
                 samples_ddim, _ = sampler.sample(S=opt.steps,
                                                  conditioning=c,
                                                  batch_size=c['c_concat'][0].shape[0],
                                                  shape=shape,
-                                                #  unconditional_guidance_scale=7.0,
-                                                #  unconditional_conditioning=uc,
+                                                 unconditional_guidance_scale=3,
+                                                 unconditional_conditioning=uc,
                                                  verbose=False)
                 x_samples_ddim = model.decode_first_stage(samples_ddim)
 

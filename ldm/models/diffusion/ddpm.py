@@ -434,6 +434,7 @@ class LatentDiffusion(DDPM):
                  conditioning_key=None,
                  scale_factor=1.0,
                  scale_by_std=False,
+                 cond_dropout=0,
                  *args, **kwargs):
         self.num_timesteps_cond = default(num_timesteps_cond, 1)
         self.scale_by_std = scale_by_std
@@ -449,6 +450,7 @@ class LatentDiffusion(DDPM):
         self.concat_mode = concat_mode
         self.cond_stage_trainable = cond_stage_trainable
         self.cond_stage_key = cond_stage_key
+        self.cond_dropout = cond_dropout
         try:
             self.num_downs = len(first_stage_config.params.ddconfig.ch_mult) - 1
         except:
@@ -1037,6 +1039,12 @@ class LatentDiffusion(DDPM):
     def p_losses(self, x_start, cond, t, noise=None):
         noise = default(noise, lambda: torch.randn_like(x_start))
         x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
+        
+        # Add training dropout for classifier-free guidance
+        # See issue here https://github.com/CompVis/latent-diffusion/issues/139
+        if self.training and self.cond_dropout != 0 and bool(torch.randn(1)[0] < self.cond_dropout):
+            cond = {k: [torch.zeros_like(v) for v in cond[k]] for k in cond.keys()}
+
         model_output = self.apply_model(x_noisy, t, cond)
 
         loss_dict = {}
@@ -1274,7 +1282,7 @@ class LatentDiffusion(DDPM):
 
 
     @torch.no_grad()
-    def log_images(self, batch, N=8, n_row=4, sample=True, ddim_steps=200, ddim_eta=1., return_keys=None,
+    def log_images(self, batch, N=8, n_row=4, sample=True, ddim_steps=200, ddim_eta=1., return_keys=None, unconditional_guidance_scale=1.0,
                    quantize_denoised=True, inpaint=True, plot_denoise_rows=False, plot_progressive_rows=True,
                    plot_diffusion_rows=True, mix_sample=False, plot_inputs=False, plot_reconstructions=False, **kwargs):
 
@@ -1336,9 +1344,12 @@ class LatentDiffusion(DDPM):
         if sample:
             columns = []
 
+            uc = {'c_concat': [torch.zeros_like(v) for v in c['c_concat']], 'c_crossattn': [torch.zeros_like(v) for v in c['c_crossattn']]} 
             # get denoise row
             with self.ema_scope("Plotting"):
                 samples, z_denoise_row = self.sample_log(cond=c,batch_size=N,ddim=use_ddim,
+                                                         unconditional_guidance_scale=unconditional_guidance_scale,
+                                                         unconditional_conditioning=uc,
                                                          ddim_steps=ddim_steps,eta=ddim_eta, log_every_t=20)
                 # samples, z_denoise_row = self.sample(cond=c, batch_size=N, return_intermediates=True)
             x_samples = self.decode_first_stage(samples)
@@ -1464,6 +1475,8 @@ class DiffusionWrapper(pl.LightningModule):
         self.diffusion_model = instantiate_from_config(diff_model_config)
         self.conditioning_key = conditioning_key
         assert self.conditioning_key in [None, 'concat', 'crossattn', 'hybrid', 'adm']
+        if self.conditioning_key in ['crossattn','hybrid']:
+            assert diff_model_config.params.use_spatial_transformer, "Only spatial transformer can handle cross-attention condition"
 
     def forward(self, x, t, c_concat: list = None, c_crossattn: list = None):
         if self.conditioning_key is None:
