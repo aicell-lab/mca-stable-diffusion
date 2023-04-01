@@ -154,6 +154,8 @@ class CrossAttention(nn.Module):
         super().__init__()
         inner_dim = dim_head * heads
         context_dim = default(context_dim, query_dim)
+        self.context_dim = context_dim
+        self.inner_dim = inner_dim
 
         self.scale = dim_head ** -0.5
         self.heads = heads
@@ -172,9 +174,13 @@ class CrossAttention(nn.Module):
 
         q = self.to_q(x)
         context = default(context, x)
-        k = self.to_k(context)
-        v = self.to_v(context)
-
+        if len(context.size()) == 2:
+            context = context.repeat(q.shape[0], 1, 1)
+        try:
+            k = self.to_k(context)
+            v = self.to_v(context)
+        except RuntimeError:
+            raise RuntimeError(f"`context_dim` should be {context.shape[2]} (instead of {self.context_dim})")
         q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> (b h) n d', h=h), (q, k, v))
 
         sim = einsum('b i d, b j d -> b i j', q, k) * self.scale

@@ -156,7 +156,7 @@ lightning:
         increase_log_steps: false
         log_to_slack: ["combined"]
         log_images_kwargs:
-          ddim_steps: 200
+          ddim_steps: 100
           quantize_denoised: false
           inpaint: false
           unconditional_guidance_scale: 3.0
