@@ -45,7 +45,7 @@ model:
       params:
         embed_dim: 4
         monitor: "val/rec_loss"
-        ckpt_path: "/home/wei.ouyang/workspace/stable-diffusion/logs/2022-10-13T04-31-31_autoencoder_kl_32x32x4_hpa/checkpoints/epoch=000008.ckpt"
+        ckpt_path: "/data/wei/stable-diffusion/logs/2022-10-13T04-31-31_autoencoder_kl_32x32x4_hpa/checkpoints/epoch=000008.ckpt"
         ddconfig:
           double_z: True
           z_channels: 4

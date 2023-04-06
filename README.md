@@ -288,3 +288,23 @@ Diffusion model ith spatial transformer:
 3 | cond_stage_model  | HPAClassEmbedder | 55.3 M
 -------------------------------------------------------
 ```
+
+### About protein embedding
+
+The protein embedding can be downloaded from uniprot:
+```bash
+wget https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/embeddings/UP000005640_9606/per-protein.h5
+```
+
+
+### About guidance scale
+
+ - A value of 0 gives random images and does not consider your prompt at all.
+
+ - Lower values give more "creative" images, but with a lot of elements unrelated to your prompt (pulled from other unrelated images). Prompt itself may also be poorly represented.
+
+ - Higher values give images which represent your prompt more precisely. However, results are less "creative" (less elements are pulled from images unrelated to your prompt), and with particularly high values you cat get some image artifacts.
+
+ - Negative values, in theory, can also work - making images of everything but things in your prompt. I don't think it currently works with SD though.
+
+For the original SD, optimal values are between 5-15. Use lower values for creative outputs, and higher values if you want to get more usable, sharp images.

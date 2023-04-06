@@ -384,17 +384,19 @@ class ClassEmbedder(nn.Module):
         return c
 
 class HPAClassEmbedder(nn.Module):
-    def __init__(self, include_location=False, include_ref_image=False, include_cellline=True, include_embed=False, image_embedding_model=None):
+    def __init__(self, include_location=False, include_ref_image=False, include_cellline=True, include_embed=False, use_loc_embedding=True, image_embedding_model=None):
         super().__init__()
         self.include_location = include_location
         self.include_ref_image = include_ref_image
         self.include_embed = include_embed
         self.include_cellline = include_cellline
-        self.loc_embedding = nn.Sequential(
-            nn.Linear(len(location_mapping.keys()), 128),
-            nn.ReLU(),
-            nn.Linear(128, 128),
-        )
+        self.use_loc_embedding = use_loc_embedding
+        if self.use_loc_embedding:
+            self.loc_embedding = nn.Sequential(
+                nn.Linear(len(location_mapping.keys()), 128),
+                nn.ReLU(),
+                nn.Linear(128, 128),
+            )
         
         if image_embedding_model:
             assert not isinstance(image_embedding_model, dict)
@@ -407,8 +409,11 @@ class HPAClassEmbedder(nn.Module):
         if self.include_embed:
             embed.append(batch["embed"])
         if self.include_location:
-            embeder = self.loc_embedding.to(batch["location_classes"].device)
-            embed.append(embeder(batch["location_classes"]))
+            if self.use_loc_embedding:
+                embeder = self.loc_embedding.to(batch["location_classes"].device)
+                embed.append(embeder(batch["location_classes"]))
+            else:
+                embed.append(batch["location_classes"])
         if self.include_ref_image:
             image = batch["ref-image"]
             assert image.shape[3] == 3

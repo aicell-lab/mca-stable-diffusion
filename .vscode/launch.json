@@ -14,6 +14,20 @@
             "justMyCode": true
         },
         {
+            "name": "prot2img",
+            "type": "python",
+            "request": "launch",
+            "program": "scripts/prot2img.py",
+            "args": [
+                "--config=configs/latent-diffusion/hpa-ldm-vq-4-hybrid-protein-location-augmentation.yaml",
+                "--checkpoint=logs/2023-04-01T02-25-30_hpa-ldm-vq-4-hybrid-protein-location-augmentation/checkpoints/last.ckpt",
+                "--scale=7",
+                "--outdir=./data7"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
             "name": "Train: hpa-ldm-vq-4-unconditional",
             "type": "python",
             "request": "launch",

@@ -30,7 +30,7 @@ error:
 Traceback (most recent call last):
   File "create_bert_embedding_dataset.py", line 14, in <module>
     bert_embedding = encode_sequence_bert(info["sequences"][0], device="cuda")[1].cpu().numpy()
-  File "/home/wei.ouyang/workspace/stable-diffusion/sequence_embedding.py", line 62, in encode_sequence_bert
+  File "/data/wei/stable-diffusion/sequence_embedding.py", line 62, in encode_sequence_bert
     protein_vector = torch.tensor(vec[None, :]).to(device)
 RuntimeError: CUDA error: device-side assert triggered
 

@@ -66,12 +66,24 @@ def make_batch(image, mask, device):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    # parser.add_argument(
-    #     "--indir",
-    #     type=str,
-    #     nargs="?",
-    #     help="dir containing image-mask pairs (`example.png` and `example_mask.png`)",
-    # )
+    parser.add_argument(
+        "--config",
+        type=str,
+        nargs="?",
+        help="the model config",
+    )
+    parser.add_argument(
+        "--checkpoint",
+        type=str,
+        nargs="?",
+        help="the model checkpoint",
+    )
+    parser.add_argument(
+        "--scale",
+        type=int,
+        default=1,
+        help="unconditional guidance scale",
+    )
     parser.add_argument(
         "--outdir",
         type=str,
@@ -106,9 +118,9 @@ if __name__ == "__main__":
     # 'file_path_': 'data/celeba/data256x256/21508.jpg'
     
 
-    config = OmegaConf.load("/home/wei.ouyang/workspace/stable-diffusion/configs/latent-diffusion/hpa-ldm-vq-4-hybrid-protein-location-augmentation-debug.yaml")
+    config = OmegaConf.load(opt.config)
     model = instantiate_from_config(config.model)
-    model.load_state_dict(torch.load("/home/wei.ouyang/workspace/stable-diffusion/logs/2023-03-31T21-01-17_hpa-ldm-vq-4-hybrid-protein-location-augmentation-debug/checkpoints/epoch=000004.ckpt")["state_dict"],
+    model.load_state_dict(torch.load(opt.checkpoint)["state_dict"],
                           strict=False)
 
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -139,15 +151,20 @@ if __name__ == "__main__":
                                                  conditioning=c,
                                                  batch_size=c['c_concat'][0].shape[0],
                                                  shape=shape,
-                                                 unconditional_guidance_scale=3,
+                                                 unconditional_guidance_scale=opt.scale,
                                                  unconditional_conditioning=uc,
                                                  verbose=False)
                 x_samples_ddim = model.decode_first_stage(samples_ddim)
 
+                prot_image = torch.clamp((sample['image']+1.0)/2.0,
+                                    min=0.0, max=1.0)
                 ref_image = torch.clamp((ref+1.0)/2.0,
                                     min=0.0, max=1.0)
                 predicted_image = torch.clamp((x_samples_ddim+1.0)/2.0,
                                               min=0.0, max=1.0)
+
+                prot_image = prot_image.cpu().numpy()[0]*255
+                Image.fromarray(prot_image.astype(np.uint8)).save(outpath+sample['info']['locations']+'_protein.png')
 
                 ref_image = ref_image.cpu().numpy()[0]*255
                 Image.fromarray(ref_image.astype(np.uint8)).save(outpath+sample['info']['locations']+'_reference.png')
