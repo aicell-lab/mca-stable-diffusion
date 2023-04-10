@@ -1043,7 +1043,9 @@ class LatentDiffusion(DDPM):
         # Add training dropout for classifier-free guidance
         # See issue here https://github.com/CompVis/latent-diffusion/issues/139
         if self.training and self.cond_dropout != 0 and bool(torch.randn(1)[0] < self.cond_dropout):
-            cond = {k: [torch.zeros_like(v) for v in cond[k]] for k in cond.keys()}
+            # cond = {k: [torch.zeros_like(v) for v in cond[k]] for k in cond.keys()}
+            # Keep the c_concat and set c_crossattn to zero
+            cond['c_crossattn'] = [torch.zeros_like(v) for v in cond['c_crossattn']]
 
         model_output = self.apply_model(x_noisy, t, cond)
 
@@ -1344,7 +1346,9 @@ class LatentDiffusion(DDPM):
         if sample:
             columns = []
 
-            uc = {'c_concat': [torch.zeros_like(v) for v in c['c_concat']], 'c_crossattn': [torch.zeros_like(v) for v in c['c_crossattn']]} 
+            # uc = {'c_concat': [torch.zeros_like(v) for v in c['c_concat']], 'c_crossattn': [torch.zeros_like(v) for v in c['c_crossattn']]} 
+            # Keep the c_concat and set c_crossattn to zero
+            uc = {'c_concat': c['c_concat'], 'c_crossattn': [torch.zeros_like(v) for v in c['c_crossattn']]} 
             # get denoise row
             with self.ema_scope("Plotting"):
                 samples, z_denoise_row = self.sample_log(cond=c,batch_size=N,ddim=use_ddim,

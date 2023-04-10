@@ -136,15 +136,16 @@ if __name__ == "__main__":
                 # print(d['info']['Ab state'], d['info']['locations'], d['location_classes'])
                 sample = {k: torch.from_numpy(np.expand_dims(sample[k], axis=0)).to(device) if isinstance(sample[k], (np.ndarray, np.generic)) else sample[k] for k in sample.keys()}
                 name = sample['info']['filename'].split('/')[-1]
-                if ref is None:
-                    ref = sample['ref-image']
-                else:
-                    sample['ref-image'] = ref
+                # if ref is None:
+                ref = sample['ref-image']
+                # else:
+                #     sample['ref-image'] = ref
                 outpath = os.path.join(opt.outdir, name)
 
                 # encode masked image and concat downsampled mask
                 c = model.cond_stage_model(sample)
-                uc = {'c_concat': [torch.zeros_like(v) for v in c['c_concat']], 'c_crossattn': [torch.zeros_like(v) for v in c['c_crossattn']]} #
+                # uc = {'c_concat': [torch.zeros_like(v) for v in c['c_concat']], 'c_crossattn': [torch.zeros_like(v) for v in c['c_crossattn']]} #
+                uc = {'c_concat': c['c_concat'], 'c_crossattn': [torch.zeros_like(v) for v in c['c_crossattn']]} #
 
                 shape = (c['c_concat'][0].shape[1],)+c['c_concat'][0].shape[2:]
                 samples_ddim, _ = sampler.sample(S=opt.steps,
