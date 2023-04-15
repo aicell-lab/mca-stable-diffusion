@@ -20,9 +20,25 @@
             "program": "scripts/prot2img.py",
             "args": [
                 "--config=configs/latent-diffusion/hpa-ldm-vq-4-hybrid-protein-location-augmentation.yaml",
-                "--checkpoint=logs/2023-04-01T02-25-30_hpa-ldm-vq-4-hybrid-protein-location-augmentation/checkpoints/last.ckpt",
-                "--scale=7",
-                "--outdir=./data7"
+                "--checkpoint=logs/2023-04-07T01-25-41_hpa-ldm-vq-4-hybrid-protein-location-augmentation/checkpoints/last.ckpt",
+                "--scale=2",
+                "--outdir=./data/22-fixed",
+                "--fix-reference"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
+            "name": "Train: hpa-ldm-vq-4-hybrid-protein-uniprot",
+            "type": "python",
+            "request": "launch",
+            "program": "main.py",
+            "args": [
+                "-t",
+                "-b",
+                "configs/latent-diffusion/hpa-ldm-vq-4-hybrid-protein-uniprot-debug.yaml",
+                "--gpus=0,1,2,3",
+                "--scale_lr=False"
             ],
             "console": "integratedTerminal",
             "justMyCode": true

@@ -2,7 +2,7 @@ model:
   base_learning_rate: 5.0e-5   # set to target_lr by starting main.py with '--scale_lr False'
   target: ldm.models.diffusion.ddpm.LatentDiffusion
   params:
-    ckpt_path: logs/2023-04-07T01-25-41_hpa-ldm-vq-4-hybrid-protein-location-augmentation/checkpoints/last.ckpt
+    ckpt_path: null
     linear_start: 0.0015
     linear_end: 0.0155
     num_timesteps_cond: 1
@@ -13,7 +13,7 @@ model:
     cond_stage_key: "hybrid-conditions" # the key in the dataset for feeding into the condition model
     image_size: 64
     channels: 3
-    cond_stage_trainable: true
+    cond_stage_trainable: false
     concat_mode: false # this will set conditioning_key to "crossattn" if not exists
     conditioning_key: hybrid # force it to conditioning_key to be "hybrid"
     cond_dropout: 0.1 # dropout conditions for class-conditioned model
@@ -44,7 +44,7 @@ model:
         use_scale_shift_norm: True
         resblock_updown: True
         use_spatial_transformer: True
-        context_dim: 33
+        context_dim: 1062
 
     first_stage_config:
       target: ldm.models.autoencoder.VQModelInterface
@@ -71,13 +71,8 @@ model:
           target: torch.nn.Identity
 
     cond_stage_config:
-      target: ldm.data.hpa.HPAClassEmbedder
+      target: ldm.data.hpa.HPAHybridEmbedder
       params:
-        include_location: true
-        include_ref_image: true
-        include_cellline: false
-        include_embed: false
-        use_loc_embedding: false
         image_embedding_model:
           target: ldm.models.autoencoder.VQModelInterface
           params:
@@ -126,19 +121,20 @@ data:
         seed: 123
         group: 'train'
         train_split_ratio: null
-        cache_file: /data/wei/hpa-webdataset-all-composite/HPACombineDatasetMetadataInMemory-256-1000-t5.pickle
+        cache_file: /data/wei/hpa-webdataset-all-composite/HPACombineDatasetMetadataInMemory-256-t5.pickle
         channels: [1, 1, 1]
         filter_func: has_location
         rotate_and_flip: true
         include_location: true
         split_by_indexes: /data/wei/hpa-webdataset-all-composite/stage1_data_split.json
+        use_uniprot_embedding: /data/wei/stable-diffusion/data/per-protein.h5
     validation:
       target: ldm.data.hpa.HPACombineDatasetMetadataInMemory
       params:
         seed: 123
         group: 'validation'
         train_split_ratio: null
-        cache_file: /data/wei/hpa-webdataset-all-composite/HPACombineDatasetMetadataInMemory-256-1000-t5.pickle
+        cache_file: /data/wei/hpa-webdataset-all-composite/HPACombineDatasetMetadataInMemory-256-t5.pickle
         channels: [1, 1, 1]
         filter_func: has_location
         include_location: true
@@ -148,18 +144,18 @@ lightning:
     image_logger:
       target: main.ImageLogger
       params:
-        batch_frequency: 1000
+        batch_frequency: 4000
         log_validation: true
-        val_batch_frequency: 1000
+        val_batch_frequency: 4000
         monitor_val_metric: "val/loss_simple_ema"
         max_images: 8
         increase_log_steps: false
-        log_to_slack: []
+        log_to_slack: ["combined"]
         log_images_kwargs:
-          ddim_steps: 50
+          ddim_steps: 100
           quantize_denoised: false
           inpaint: false
-          unconditional_guidance_scale: 10.0
+          unconditional_guidance_scale: 2.0
           plot_denoise_rows: true
           plot_progressive_rows: false
           plot_diffusion_rows: false
@@ -169,6 +165,6 @@ lightning:
           n_row: 8
 
   trainer:
-    val_check_interval: 10
+    val_check_interval: 1.0
     benchmark: True
     accelerator: dp # need to change to dp because the default ddp will free the training

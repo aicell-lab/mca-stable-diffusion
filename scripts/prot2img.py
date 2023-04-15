@@ -9,6 +9,12 @@ from ldm.models.diffusion.ddim import DDIMSampler
 from ldm.models.diffusion.plms import PLMSSampler
 from ldm.util import instantiate_from_config
 import yaml
+import matplotlib.pyplot as plt
+
+"""
+Command example: python scripts/prot2img.py --config=configs/latent-diffusion/hpa-ldm-vq-4-hybrid-protein-location-augmentation.yaml --checkpoint=logs/2023-04-07T01-25-41_hpa-ldm-vq-4-hybrid-protein-location-augmentation/checkpoints/last.ckpt --scale=2 --outdir=./data/22-fixed --fix-reference
+
+"""
 
 data_config_yaml = """
 data:
@@ -65,7 +71,7 @@ def make_batch(image, mask, device):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="Predict protein images. Example command: python scripts/prot2img.py --config=configs/latent-diffusion/hpa-ldm-vq-4-hybrid-protein-location-augmentation.yaml --checkpoint=logs/2023-04-07T01-25-41_hpa-ldm-vq-4-hybrid-protein-location-augmentation/checkpoints/last.ckpt --scale=2 --outdir=./data/22-fixed --fix-reference")
     parser.add_argument(
         "--config",
         type=str,
@@ -77,6 +83,11 @@ if __name__ == "__main__":
         type=str,
         nargs="?",
         help="the model checkpoint",
+    )
+    parser.add_argument(
+        "--fix-reference",
+        action="store_true",
+        help="fix the reference channel",
     )
     parser.add_argument(
         "--scale",
@@ -129,6 +140,9 @@ if __name__ == "__main__":
 
     ref = None
     os.makedirs(opt.outdir, exist_ok=True)
+    total_count = len(data.datasets['validation'])
+    predicted_images = []
+    locations = []
     with torch.no_grad():
         with model.ema_scope():
             for sample in tqdm(data.datasets['validation']):
@@ -136,10 +150,13 @@ if __name__ == "__main__":
                 # print(d['info']['Ab state'], d['info']['locations'], d['location_classes'])
                 sample = {k: torch.from_numpy(np.expand_dims(sample[k], axis=0)).to(device) if isinstance(sample[k], (np.ndarray, np.generic)) else sample[k] for k in sample.keys()}
                 name = sample['info']['filename'].split('/')[-1]
-                # if ref is None:
-                ref = sample['ref-image']
-                # else:
-                #     sample['ref-image'] = ref
+                if opt.fix_reference:
+                    if ref is None:
+                        ref = sample['ref-image']
+                    else:
+                        sample['ref-image'] = ref
+                else:
+                    ref = sample['ref-image']
                 outpath = os.path.join(opt.outdir, name)
 
                 # encode masked image and concat downsampled mask
@@ -164,11 +181,60 @@ if __name__ == "__main__":
                 predicted_image = torch.clamp((x_samples_ddim+1.0)/2.0,
                                               min=0.0, max=1.0)
 
-                prot_image = prot_image.cpu().numpy()[0]*255
-                Image.fromarray(prot_image.astype(np.uint8)).save(outpath+sample['info']['locations']+'_protein.png')
-
+                if not opt.fix_reference:
+                    prot_image = prot_image.cpu().numpy()[0]*255
+                    Image.fromarray(prot_image.astype(np.uint8)).save(outpath+sample['info']['locations']+'_protein.png')
+                
                 ref_image = ref_image.cpu().numpy()[0]*255
                 Image.fromarray(ref_image.astype(np.uint8)).save(outpath+sample['info']['locations']+'_reference.png')
                 
                 predicted_image = predicted_image.cpu().numpy().transpose(0,2,3,1)[0]*255
                 Image.fromarray(predicted_image.astype(np.uint8)).save(outpath+sample['info']['locations']+'_prediction.png')
+
+                predicted_images.append(predicted_image)
+                locations.append(sample['info']['locations'])
+
+    # plot the first 20 images in a grid
+    plt.figure(figsize=(20,12))
+    # set color map to gray
+    plt.set_cmap('gray')
+
+    for i in range(15):
+        plt.subplot(3,5,i+1)
+        image = predicted_images[i].sum(axis=2)
+        # clip the image to 0-1
+        image = np.clip(image, 0, 255) / 255.0
+        plt.imshow(image)
+        plt.axis('off')
+        # plot text in each image with locations
+        plt.text(0, 20, locations[i], color='white', fontsize=10)
+        
+    plt.suptitle(f'Stable Diffusion Predicted Images (condition: location, guidance scale = {opt.scale})')
+    plt.savefig(os.path.join(opt.outdir, f'predicted-image-grid-s{opt.scale}.png'))
+
+    if opt.fix_reference:
+        # Save images in a pickle file
+        import pickle
+        pickle.dump({"prediction": predicted_images, "reference": ref_image, "locations": locations}, open(os.path.join(opt.outdir, 'predictions.pkl'), 'wb'))
+        
+        # for each predicted image, we assign a random color map from matplotlib
+        # then we stack all the color images into one
+        # and save it
+        import matplotlib.pyplot as plt
+        import random
+        import colorsys
+        # get all the color maps
+        cms = list(plt.cm.datad.keys()) # 75 color maps
+        
+        result_image = np.zeros((predicted_images[0].shape[0], predicted_images[0].shape[1], 3))
+        # Get the color map by name:
+        for i in range(len(predicted_images)):
+            h,s,l = random.random(), 0.5 + random.random()/2.0, 0.4 + random.random()/5.0
+            r,g,b = [int(256*i) for i in colorsys.hls_to_rgb(h,l,s)]
+            image = predicted_images[i].sum(axis=2)
+            # clip the image to 0-1
+            image = np.clip(image, 0, 255) / 255.0
+            colored_image = np.stack([image*r, image*g, image*b], axis=2)
+            result_image += colored_image
+        result_image = result_image/result_image.max() * 255.0
+        Image.fromarray(result_image.astype(np.uint8)).save(os.path.join(opt.outdir, 'super-multiplexed.png'))

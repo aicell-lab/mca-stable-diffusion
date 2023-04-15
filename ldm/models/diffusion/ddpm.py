@@ -1346,17 +1346,34 @@ class LatentDiffusion(DDPM):
         if sample:
             columns = []
 
+            c = self.cond_stage_model(batch)
             # uc = {'c_concat': [torch.zeros_like(v) for v in c['c_concat']], 'c_crossattn': [torch.zeros_like(v) for v in c['c_crossattn']]} 
             # Keep the c_concat and set c_crossattn to zero
             uc = {'c_concat': c['c_concat'], 'c_crossattn': [torch.zeros_like(v) for v in c['c_crossattn']]} 
-            # get denoise row
+
+            shape = (c['c_concat'][0].shape[1],)+c['c_concat'][0].shape[2:]
+            z_denoise_row = None
             with self.ema_scope("Plotting"):
-                samples, z_denoise_row = self.sample_log(cond=c,batch_size=N,ddim=use_ddim,
-                                                         unconditional_guidance_scale=unconditional_guidance_scale,
-                                                         unconditional_conditioning=uc,
-                                                         ddim_steps=ddim_steps,eta=ddim_eta, log_every_t=20)
-                # samples, z_denoise_row = self.sample(cond=c, batch_size=N, return_intermediates=True)
-            x_samples = self.decode_first_stage(samples)
+                sampler = DDIMSampler(self)
+                samples_ddim, _ = sampler.sample(S=ddim_steps,
+                                                    conditioning=c,
+                                                    batch_size=c['c_concat'][0].shape[0],
+                                                    shape=shape,
+                                                    unconditional_guidance_scale=unconditional_guidance_scale,
+                                                    unconditional_conditioning=uc,
+                                                    eta=ddim_eta,
+                                                    log_every_t=20,
+                                                    verbose=False)
+            x_samples = self.decode_first_stage(samples_ddim)
+
+            # # get denoise row
+            # with self.ema_scope("Plotting"):
+            #     samples, z_denoise_row = self.sample_log(cond=c,batch_size=N,ddim=use_ddim,
+            #                                              unconditional_guidance_scale=unconditional_guidance_scale,
+            #                                              unconditional_conditioning=uc,
+            #                                              ddim_steps=ddim_steps,eta=ddim_eta, log_every_t=20)
+            #     # samples, z_denoise_row = self.sample(cond=c, batch_size=N, return_intermediates=True)
+            # x_samples = self.decode_first_stage(samples)
             samples_grid = make_grid(x_samples, nrow=1)
 
             if mix_sample:
@@ -1366,7 +1383,7 @@ class LatentDiffusion(DDPM):
 
             columns = [samples_grid, ] + columns
             
-            if plot_denoise_rows:
+            if plot_denoise_rows and z_denoise_row is not None:
                 denoise_grid = self._get_denoise_row_from_list(z_denoise_row['pred_x0'])
                 # Fix size issue when there is only 1 image
                 if denoise_grid.shape[1] > samples_grid.shape[1]:

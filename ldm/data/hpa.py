@@ -18,6 +18,7 @@ from einops import rearrange
 from ldm.util import instantiate_from_config
 from torchvision.utils import make_grid
 import json
+import h5py
 
 try:
    import cPickle as pickle
@@ -176,7 +177,7 @@ class HPACombineDatasetMetadataInMemory():
         with open(cache_file, 'wb') as fp:
             pickle.dump(samples, fp)
 
-    def __init__(self, cache_file, seed=123, train_split_ratio=0.95, group='train', channels=None, include_location=False, return_info=False, filter_func=None, dump_to_file=None, rotate_and_flip=False, split_by_indexes=None):
+    def __init__(self, cache_file, seed=123, train_split_ratio=0.95, group='train', channels=None, include_location=False, return_info=False, filter_func=None, dump_to_file=None, rotate_and_flip=False, split_by_indexes=None, use_uniprot_embedding=False):
         if cache_file in HPACombineDatasetMetadataInMemory.samples_dict:
             self.samples = HPACombineDatasetMetadataInMemory.samples_dict[cache_file]
         else:
@@ -203,6 +204,19 @@ class HPACombineDatasetMetadataInMemory():
                 filter_func = lambda x: int( x['info']['status']) == 35 and x['info']['Ab state'] == 'IF_FINISHED' and str(x['info']['locations']) != "nan"
 
             self.samples = list(filter(filter_func, self.samples))
+        
+        if use_uniprot_embedding:
+            with h5py.File(use_uniprot_embedding, "r") as file:
+                def filter_uniprot_protein(sample):
+                    if len(sample['info']['sequences']) > 0:
+                        for seq in sample['info']['sequences']:
+                            prot_id = seq.split('|')[1]
+                            if prot_id in file:
+                                sample['prot_id'] = prot_id
+                                sample['embed'] = np.array(file[prot_id])
+                                return True
+                    return False
+                self.samples = list(filter(filter_uniprot_protein, self.samples))
         
         if dump_to_file:
             assert dump_to_file != cache_file, "please do not overwrite the cache file"
