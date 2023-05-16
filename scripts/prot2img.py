@@ -20,31 +20,38 @@ data_config_yaml = """
 data:
   target: main.DataModuleFromConfig
   params:
-    batch_size: 48
-    num_workers: 5
+    batch_size: 8
+    num_workers: 16
     wrap: false
     train:
       target: ldm.data.hpa.HPACombineDatasetMetadataInMemory
       params:
         seed: 123
+        group: train
         train_split_ratio: 0.95
-        group: 'train'
-        cache_file: /data/wei/hpa-webdataset-all-composite/HPACombineDatasetMetadataInMemory-256-1000.pickle
-        channels: [1, 1, 1]
-        return_info: true
+        cache_file: /data/wei/hpa-webdataset-all-composite/HPACombineDatasetMetadataInMemory-256-t5.pickle
+        channels:
+        - 1
+        - 1
+        - 1
         filter_func: has_location
+        rotate_and_flip: true
         include_location: true
+        use_uniprot_embedding: /data/wei/stable-diffusion/data/per-protein.h5
     validation:
       target: ldm.data.hpa.HPACombineDatasetMetadataInMemory
       params:
         seed: 123
+        group: validation
         train_split_ratio: 0.95
-        group: 'validation'
-        cache_file: /data/wei/hpa-webdataset-all-composite/HPACombineDatasetMetadataInMemory-256-1000.pickle
-        channels: [1, 1, 1]
-        return_info: true
+        cache_file: /data/wei/hpa-webdataset-all-composite/HPACombineDatasetMetadataInMemory-256-t5.pickle
+        channels:
+        - 1
+        - 1
+        - 1
         filter_func: has_location
         include_location: true
+        use_uniprot_embedding: /data/wei/stable-diffusion/data/per-protein.h5
 """
 
 
@@ -112,6 +119,7 @@ if __name__ == "__main__":
 
     config = yaml.safe_load(data_config_yaml)
     data_config = config['data']
+    data_config['params']["train"]["params"]["return_info"] = True
 
     # data
     data = instantiate_from_config(data_config)
@@ -140,12 +148,12 @@ if __name__ == "__main__":
 
     ref = None
     os.makedirs(opt.outdir, exist_ok=True)
-    total_count = len(data.datasets['validation'])
+    total_count = len(data.datasets['train'])
     predicted_images = []
     locations = []
     with torch.no_grad():
         with model.ema_scope():
-            for sample in tqdm(data.datasets['validation']):
+            for sample in tqdm(data.datasets['train']):
             # for image, mask in tqdm(zip(images, masks)):
                 # print(d['info']['Ab state'], d['info']['locations'], d['location_classes'])
                 sample = {k: torch.from_numpy(np.expand_dims(sample[k], axis=0)).to(device) if isinstance(sample[k], (np.ndarray, np.generic)) else sample[k] for k in sample.keys()}

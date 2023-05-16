@@ -47,10 +47,11 @@ class HPACombineDataset(Dataset):
             if protein_embedding == "bert":
                 url = f"{HPA_DATA_ROOT}/{filename}_bert.tar"
                 dataset3 = wds.WebDataset(url, nodesplitter=wds.split_by_node).decode().to_tuple("__key__", "bert.pyd")
-            else:
+            elif protein_embedding == "t5":
                 url = f"{HPA_DATA_ROOT}/{filename}_t5.tar"
                 dataset3 = wds.WebDataset(url, nodesplitter=wds.split_by_node).decode().to_tuple("__key__", "t5.pyd")
-
+            else:
+                raise NotImplementedError()
             self.dataset_iter = iter(zip(dataset1, dataset2, dataset3))
         
         self._generator = self.sample_generator()
@@ -206,17 +207,16 @@ class HPACombineDatasetMetadataInMemory():
             self.samples = list(filter(filter_func, self.samples))
         
         if use_uniprot_embedding:
+            uniprot_indexes = []
             with h5py.File(use_uniprot_embedding, "r") as file:
-                def filter_uniprot_protein(sample):
+                for idx, sample in enumerate(self.samples):
                     if len(sample['info']['sequences']) > 0:
                         for seq in sample['info']['sequences']:
                             prot_id = seq.split('|')[1]
                             if prot_id in file:
                                 sample['prot_id'] = prot_id
                                 sample['embed'] = np.array(file[prot_id])
-                                return True
-                    return False
-                self.samples = list(filter(filter_uniprot_protein, self.samples))
+                                uniprot_indexes.append(idx)
         
         if dump_to_file:
             assert dump_to_file != cache_file, "please do not overwrite the cache file"
@@ -245,11 +245,16 @@ class HPACombineDatasetMetadataInMemory():
                 self.indexes = indexes[:size]
             else:
                 self.indexes = indexes[size:]
+            if use_uniprot_embedding:
+                self.indexes = list(filter(lambda i: i in uniprot_indexes, self.indexes))
         else:
             assert train_split_ratio is None, "train_split_ratio should not be None when split_by_indexes is used"
             with open(split_by_indexes, "r") as in_file:
                 idcs = json.load(in_file)
+            # assert len(self.samples) == len(idcs['train']) + len(idcs['validation'])
             self.indexes = list(filter(lambda i: i < self.length, idcs[group]))
+            if use_uniprot_embedding:
+                self.indexes = list(filter(lambda i: i in uniprot_indexes, self.indexes))
         print(f"Dataset group: {group}, length: {len(self.indexes)}, image channels: {self.channels or [0, 1, 2]}")
 
     def __len__(self):

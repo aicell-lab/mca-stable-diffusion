@@ -17,21 +17,38 @@ data_config_yaml = """
 data:
   target: main.DataModuleFromConfig
   params:
-    batch_size: 48
-    num_workers: 5
+    batch_size: 8
+    num_workers: 16
     wrap: false
     train:
-      target: ldm.data.hpa.HPACombineDatasetMetadata
+      target: ldm.data.hpa.HPACombineDatasetMetadataInMemory
       params:
-        size: 256
-        length: 247678
-        return_info: true
+        seed: 123
+        group: train
+        train_split_ratio: 0.95
+        cache_file: /data/wei/hpa-webdataset-all-composite/HPACombineDatasetMetadataInMemory-256-1000-t5.pickle
+        channels:
+        - 1
+        - 1
+        - 1
+        filter_func: has_location
+        rotate_and_flip: true
+        include_location: true
+        use_uniprot_embedding: /data/wei/stable-diffusion/data/per-protein.h5
     validation:
-      target: ldm.data.hpa.HPACombineDatasetMetadata
+      target: ldm.data.hpa.HPACombineDatasetMetadataInMemory
       params:
-        size: 256
-        length: 247678
-        return_info: true
+        seed: 123
+        group: validation
+        train_split_ratio: 0.95
+        cache_file: /data/wei/hpa-webdataset-all-composite/HPACombineDatasetMetadataInMemory-256-1000-t5.pickle
+        channels:
+        - 1
+        - 1
+        - 1
+        filter_func: has_location
+        include_location: true
+        use_uniprot_embedding: /data/wei/stable-diffusion/data/per-protein.h5
 """
 
 
