@@ -104,6 +104,21 @@
             "justMyCode": true
         },
         {
+            "name": "Train: hpa-ldm-vq-4-hybrid-protein-densenet-debug",
+            "type": "python",
+            "request": "launch",
+            "program": "main.py",
+            "args": [
+                "-t",
+                "-b",
+                "configs/latent-diffusion/hpa-ldm-vq-4-hybrid-protein-densenet-debug.yaml",
+                "--gpus=0,1,2,3",
+                "--scale_lr=False"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
             "name": "Train: hpa-ldm-vq-4-hybrid-protein-location-augmentation-debug",
             "type": "python",
             "request": "launch",

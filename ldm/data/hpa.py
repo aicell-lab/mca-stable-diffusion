@@ -178,7 +178,7 @@ class HPACombineDatasetMetadataInMemory():
         with open(cache_file, 'wb') as fp:
             pickle.dump(samples, fp)
 
-    def __init__(self, cache_file, seed=123, train_split_ratio=0.95, group='train', channels=None, include_location=False, return_info=False, filter_func=None, dump_to_file=None, rotate_and_flip=False, split_by_indexes=None, use_uniprot_embedding=False):
+    def __init__(self, cache_file, seed=123, train_split_ratio=0.95, group='train', channels=None, include_location=False, include_densenet_embedding=False, return_info=False, filter_func=None, dump_to_file=None, rotate_and_flip=False, split_by_indexes=None, use_uniprot_embedding=False):
         if cache_file in HPACombineDatasetMetadataInMemory.samples_dict:
             self.samples = HPACombineDatasetMetadataInMemory.samples_dict[cache_file]
         else:
@@ -186,6 +186,29 @@ class HPACombineDatasetMetadataInMemory():
                 print(f"Loading data from cache file {cache_file}, this may take a while...")
                 with open(cache_file, 'rb') as fp:
                     self.samples = pickle.load(fp)
+                
+                if include_densenet_embedding:
+                    assert split_by_indexes is None
+                    with open("/data/wei/hpa-webdataset-all-composite/HPACombineDatasetInfo-indexes-densenet-features-avg.json", "r") as f:
+                        multi_avg_embeddings = json.load(f)
+                    with open("/data/wei/hpa-webdataset-all-composite/HPACombineDatasetInfo-densenet-features-avg.pickle", "rb") as f:
+                        densent_features_avg = pickle.load(f)
+
+                    sample_count = len(self.samples)
+                    # debug cache file example: HPACombineDatasetMetadataInMemory-256-1000-t5.pickle
+                    if "-1000" not in cache_file:
+                        assert sample_count == len(densent_features_avg)
+                    # for debug, we have less samples in the samples
+                    if len(densent_features_avg)> sample_count:
+                        multi_avg_embeddings = [idx for idx in multi_avg_embeddings if idx < sample_count]
+                    
+                    for idx in multi_avg_embeddings:
+                        self.samples[idx]['densent_avg'] = densent_features_avg[idx]
+                    
+                    self.samples = [self.samples[idx] for idx in multi_avg_embeddings]
+                    if 'embed' in self.samples[0]:
+                        for sample in self.samples:
+                            del sample['embed']
 
                 # Patch the generated pickle file to include info
                 # with open(f"{HPA_DATA_ROOT}/HPACombineDatasetInfo.pickle", 'rb') as fp:
@@ -223,6 +246,7 @@ class HPACombineDatasetMetadataInMemory():
             with open(dump_to_file, 'wb') as fp:
                 pickle.dump(self.samples, fp)
 
+        self.include_densenet_embedding = include_densenet_embedding
         self.channels = channels
         assert "info" in self.samples[0]
 
@@ -403,13 +427,14 @@ class ClassEmbedder(nn.Module):
         return c
 
 class HPAClassEmbedder(nn.Module):
-    def __init__(self, include_location=False, include_ref_image=False, include_cellline=True, include_embed=False, use_loc_embedding=True, image_embedding_model=None):
+    def __init__(self, include_location=False, include_ref_image=False, include_cellline=True, include_embed=False, use_loc_embedding=True, image_embedding_model=None, include_densenet_embedding=False):
         super().__init__()
         self.include_location = include_location
         self.include_ref_image = include_ref_image
         self.include_embed = include_embed
         self.include_cellline = include_cellline
         self.use_loc_embedding = use_loc_embedding
+        self.include_densenet_embedding = include_densenet_embedding
         if self.use_loc_embedding:
             self.loc_embedding = nn.Sequential(
                 nn.Linear(len(location_mapping.keys()), 128),
@@ -433,6 +458,9 @@ class HPAClassEmbedder(nn.Module):
                 embed.append(embeder(batch["location_classes"]))
             else:
                 embed.append(batch["location_classes"])
+        if self.include_densenet_embedding:
+            embed.append(batch["densent_avg"])
+
         if self.include_ref_image:
             image = batch["ref-image"]
             assert image.shape[3] == 3
