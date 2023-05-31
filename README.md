@@ -213,9 +213,11 @@ Thanks for open-sourcing!
 ```
 
 
-## NOTES
+## Development
 
-Train the autoencoder:
+In general you can find some useful commands with parameters in the file `.vscode/launch.json`.
+
+### Train the autoencoder
 ```
 python main.py -t -b configs/autoencoder/autoencoder_kl_32x32x4_hpa.yaml --gpus=0,1,2,3
 ```
@@ -225,9 +227,9 @@ Prepare the BERT embedding for the protein sequences:
 CUDA_VISIBLE_DEVICES=0 CUDA_LAUNCH_BLOCKING=1 python create_bert_embedding_dataset.py 
 ```
 
-Run the diffusion model:
+### Run the diffusion model
 ```
-python main.py -t -b configs/latent-diffusion/hpa-ldm-kl-8.yaml --gpus=0,1,2,3
+python main.py -t -b configs/latent-diffusion/hpa-ldm-kl-8.yaml --gpus=0,1,2,3 --scale_lr=False
 ```
 
 Output:
@@ -246,8 +248,13 @@ Output:
 ```
 
 
+### Train the diffusion model (hybrid)
+
+In the hybrid mode, the diffusion model is conditioned on images (concat mode) and global embedding vector (e.g. location label, in cross attention mode).
+
+
 ```
-python main.py -t -b configs/latent-diffusion/hpa-ldm-vq-4-hybrid.yaml --gpus=0,1,2,3
+python main.py -t -b configs/latent-diffusion/hpa-ldm-vq-4-hybrid.yaml --gpus=0,1,2,3 --scale_lr=False
 ```
 
 
@@ -287,6 +294,16 @@ Diffusion model ith spatial transformer:
 2 | first_stage_model | VQModelInterface | 55.3 M
 3 | cond_stage_model  | HPAClassEmbedder | 55.3 M
 -------------------------------------------------------
+```
+### Train the diffusion model (reference image + densenet condition)
+```
+python main.py -t -b configs/latent-diffusion/hpa-ldm-vq-4-hybrid-protein-densenet.yaml --gpus=0,1,2,3 --scale_lr=False
+```
+
+
+### Perform inference / sampling
+```
+python scripts/prot2img-densenet.py --config=configs/latent-diffusion/hpa-ldm-vq-4-hybrid-protein-densenet.yaml --checkpoint=logs/2023-05-23T16-11-15_hpa-ldm-vq-4-hybrid-protein-densenet/checkpoints/last.ckpt --scale=8 --outdir=./data/8-densenet-full --fix-reference 
 ```
 
 ### About protein embedding

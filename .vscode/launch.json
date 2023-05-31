@@ -14,6 +14,21 @@
             "justMyCode": true
         },
         {
+            "name": "prot2img-densenet",
+            "type": "python",
+            "request": "launch",
+            "program": "scripts/prot2img-densenet.py",
+            "args": [
+                "--config=configs/latent-diffusion/hpa-ldm-vq-4-hybrid-protein-densenet.yaml",
+                "--checkpoint=logs/2023-05-23T16-11-15_hpa-ldm-vq-4-hybrid-protein-densenet/checkpoints/last.ckpt",
+                "--scale=2",
+                "--outdir=./data/2-densenet",
+                "--fix-reference"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
             "name": "prot2img",
             "type": "python",
             "request": "launch",

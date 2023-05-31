@@ -26,9 +26,9 @@ import imageio
 # predicted_images.append(predicted_image)
 # locations.append(sample['info']['locations'])
 
-data_dir = "data/10-fixed"
+data_dir = "data/2-densenet"
 
-fixed_ref = "10_G5_1_Cytosol_reference.png"
+fixed_ref = "6_G1_2_Nuclear speckles_reference.png"
 # list all the files in the folder
 fixed_ref = np.array(Image.open(os.path.join(data_dir, fixed_ref)))
 
@@ -53,9 +53,9 @@ for file in os.listdir(data_dir):
         imageio.imwrite(file_path.replace("_prediction.png", "_merged.png"), merged)
         imgs.append(merged)
 
-imageio.mimwrite("data/10-fixed/stack.tif",imgs)
+imageio.mimwrite(f"{data_dir}/stack.tif",imgs)
 
 # create a gif animation from the tif file
-imageio.mimsave("data/10-fixed/stack.gif",imgs, duration=1)
+imageio.mimsave(f"{data_dir}/stack.gif",imgs, duration=1)
         
         
