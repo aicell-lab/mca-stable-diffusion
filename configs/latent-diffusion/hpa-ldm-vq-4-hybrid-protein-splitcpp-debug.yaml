@@ -42,6 +42,8 @@ model:
         num_heads: 8
         use_scale_shift_norm: True
         resblock_updown: True
+        use_spatial_transformer: True
+        context_dim: 1024
 
     first_stage_config:
       target: ldm.models.autoencoder.VQModelInterface

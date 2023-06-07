@@ -272,7 +272,7 @@ class HPACombineDatasetMetadataInMemory():
             if use_uniprot_embedding:
                 self.indexes = list(filter(lambda i: i in uniprot_indexes, self.indexes))
         else:
-            assert train_split_ratio is None, "train_split_ratio should not be None when split_by_indexes is used"
+            assert train_split_ratio is None, "train_split_ratio should be None when split_by_indexes is used"
             with open(split_by_indexes, "r") as in_file:
                 idcs = json.load(in_file)
             # assert len(self.samples) == len(idcs['train']) + len(idcs['validation'])

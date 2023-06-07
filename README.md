@@ -303,7 +303,7 @@ python main.py -t -b configs/latent-diffusion/hpa-ldm-vq-4-hybrid-protein-densen
 
 ### Perform inference / sampling
 ```
-python scripts/prot2img-densenet.py --config=configs/latent-diffusion/hpa-ldm-vq-4-hybrid-protein-densenet.yaml --checkpoint=logs/2023-05-23T16-11-15_hpa-ldm-vq-4-hybrid-protein-densenet/checkpoints/last.ckpt --scale=8 --outdir=./data/8-densenet-full --fix-reference 
+python scripts/prot2img-densenet.py --config=configs/latent-diffusion/hpa-ldm-vq-4-hybrid-protein-densenet.yaml --checkpoint=/data/wei/stable-diffusion/logs/2023-05-23T16-11-15_hpa-ldm-vq-4-hybrid-protein-densenet/checkpoints/last.ckpt --scale=8 --outdir=/data/xikunz/stable-diffusion/logs/2023-05-23T16-11-15_hpa-ldm-vq-4-hybrid-protein-densenet/guide8 --fix-reference 
 ```
 
 ### About protein embedding

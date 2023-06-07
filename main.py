@@ -109,7 +109,7 @@ def get_parser(**parser_kwargs):
         "-l",
         "--logdir",
         type=str,
-        default="logs",
+        default=f"/data/{os.environ.get('USER')}/stable-diffusion/logs",
         help="directory for logging dat shit",
     )
     parser.add_argument(
