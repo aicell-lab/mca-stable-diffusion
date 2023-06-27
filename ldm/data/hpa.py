@@ -161,6 +161,33 @@ def dump_info(info_pickle_path):
     with open(info_pickle_path, 'wb') as fp:
         pickle.dump(info_list, fp)
 
+
+def compute_avg_densenet_embeds():
+
+    
+    if include_densenet_embedding:
+        assert split_by_indexes is None
+        with open("/data/wei/hpa-webdataset-all-composite/HPACombineDatasetInfo-indexes-densenet-features-avg.json", "r") as f:
+            multi_avg_embeddings = json.load(f)
+        with open("/data/wei/hpa-webdataset-all-composite/HPACombineDatasetInfo-densenet-features-avg.pickle", "rb") as f:
+            densent_features_avg = pickle.load(f)
+
+        sample_count = len(self.samples)
+        # debug cache file example: HPACombineDatasetMetadataInMemory-256-1000-t5.pickle
+        if "-1000" not in cache_file:
+            assert sample_count == len(densent_features_avg)
+        # for debug, we have less samples in the samples
+        if len(densent_features_avg)> sample_count:
+            multi_avg_embeddings = [idx for idx in multi_avg_embeddings if idx < sample_count]
+        
+        for idx in multi_avg_embeddings:
+            self.samples[idx]['densent_avg'] = densent_features_avg[idx]
+        
+        self.samples = [self.samples[idx] for idx in multi_avg_embeddings]
+        if 'embed' in self.samples[0]:
+            for sample in self.samples:
+                del sample['embed']
+
 class HPACombineDatasetMetadataInMemory():
 
     samples_dict = {}
@@ -179,6 +206,7 @@ class HPACombineDatasetMetadataInMemory():
             pickle.dump(samples, fp)
 
     def __init__(self, cache_file, seed=123, train_split_ratio=0.95, group='train', channels=None, include_location=False, include_densenet_embedding=False, return_info=False, filter_func=None, dump_to_file=None, rotate_and_flip=False, split_by_indexes=None, use_uniprot_embedding=False):
+        # Load cache
         if cache_file in HPACombineDatasetMetadataInMemory.samples_dict:
             self.samples = HPACombineDatasetMetadataInMemory.samples_dict[cache_file]
         else:
@@ -186,60 +214,57 @@ class HPACombineDatasetMetadataInMemory():
                 print(f"Loading data from cache file {cache_file}, this may take a while...")
                 with open(cache_file, 'rb') as fp:
                     self.samples = pickle.load(fp)
-                
-                if include_densenet_embedding:
-                    assert split_by_indexes is None
-                    with open("/data/wei/hpa-webdataset-all-composite/HPACombineDatasetInfo-indexes-densenet-features-avg.json", "r") as f:
-                        multi_avg_embeddings = json.load(f)
-                    with open("/data/wei/hpa-webdataset-all-composite/HPACombineDatasetInfo-densenet-features-avg.pickle", "rb") as f:
-                        densent_features_avg = pickle.load(f)
-
-                    sample_count = len(self.samples)
-                    # debug cache file example: HPACombineDatasetMetadataInMemory-256-1000-t5.pickle
-                    if "-1000" not in cache_file:
-                        assert sample_count == len(densent_features_avg)
-                    # for debug, we have less samples in the samples
-                    if len(densent_features_avg)> sample_count:
-                        multi_avg_embeddings = [idx for idx in multi_avg_embeddings if idx < sample_count]
-                    
-                    for idx in multi_avg_embeddings:
-                        self.samples[idx]['densent_avg'] = densent_features_avg[idx]
-                    
-                    self.samples = [self.samples[idx] for idx in multi_avg_embeddings]
-                    if 'embed' in self.samples[0]:
-                        for sample in self.samples:
-                            del sample['embed']
-
-                # Patch the generated pickle file to include info
-                # with open(f"{HPA_DATA_ROOT}/HPACombineDatasetInfo.pickle", 'rb') as fp:
-                #     info_list = pickle.load(fp)
-                # assert len(info_list) == len(self.samples)
-                # for i in tqdm(range(len(self.samples)), total=len(self.samples)):
-                #     self.samples[i]["info"] = info_list[i]
-                # with open(cache_file, 'wb') as fp:
-                #     pickle.dump(self.samples, fp)
-                # print("Data loaded")
             else:
                 raise Exception(f"Cache file not found {cache_file}")
             HPACombineDatasetMetadataInMemory.samples_dict[cache_file] = self.samples
-        
-        if filter_func and split_by_indexes is None:
-            if filter_func == 'has_location':
-                filter_func = lambda x: int( x['info']['status']) == 35 and x['info']['Ab state'] == 'IF_FINISHED' and str(x['info']['locations']) != "nan"
 
-            self.samples = list(filter(filter_func, self.samples))
+        with open(f"{HPA_DATA_ROOT}/HPACombineDatasetInfo.pickle", 'rb') as fp:
+            info_list = pickle.load(fp)
+        assert len(info_list) == TOTAL_LENGTH
+
+        # Construct / Load train and validation indices
+        assert group in ['train', 'validation']
+        if split_by_indexes is None:
+            assert train_split_ratio < 1 and train_split_ratio > 0
+            filter_func4 = lambda x: int( x['status']) == 35 and x['Ab state'] == 'IF_FINISHED' and str(x["gene_names"]) != "nan" and x["sequences"]
+            indexes = []
+            for i, x in enumerate(info_list):
+                if filter_func4(x):
+                    indexes.append(i)
+            random.seed(seed)
+            # indexes = list(range(self.length))
+            random.shuffle(indexes)
+            size = int(train_split_ratio * len(indexes))
+            if group == 'train':
+                self.indexes = indexes[:size]
+            else:
+                self.indexes = indexes[size:]
+            # if use_uniprot_embedding:
+            #     self.indexes = list(filter(lambda i: i in uniprot_indexes, self.indexes))
+        else:
+            assert train_split_ratio is None, "train_split_ratio should be None when split_by_indexes is used"
+            with open(split_by_indexes, "r") as in_file:
+                idcs = json.load(in_file)
+            self.indexes = idcs[group]
+        self.indexes = list(filter(lambda i: i < len(self.samples), self.indexes))
+        
+        # if filter_func and split_by_indexes is None:
+        if filter_func == 'has_location':
+            filter_func = lambda i: str(info_list[i]['locations']) != "nan"
+
+            self.indexes = list(filter(filter_func, self.indexes))
         
         if use_uniprot_embedding:
-            uniprot_indexes = []
+            # uniprot_indexes = []
             with h5py.File(use_uniprot_embedding, "r") as file:
                 for idx, sample in enumerate(self.samples):
-                    if len(sample['info']['sequences']) > 0:
-                        for seq in sample['info']['sequences']:
-                            prot_id = seq.split('|')[1]
-                            if prot_id in file:
-                                sample['prot_id'] = prot_id
-                                sample['embed'] = np.array(file[prot_id])
-                                uniprot_indexes.append(idx)
+                    assert len(sample['info']['sequences']) > 0
+                    for seq in sample['info']['sequences']:
+                        prot_id = seq.split('|')[1]
+                        if prot_id in file:
+                            sample['prot_id'] = prot_id
+                            sample['embed'] = np.array(file[prot_id])
+                                # uniprot_indexes.append(idx)
         
         if dump_to_file:
             assert dump_to_file != cache_file, "please do not overwrite the cache file"
@@ -257,28 +282,6 @@ class HPACombineDatasetMetadataInMemory():
             self.preprocessor = albumentations.Compose(
                 [albumentations.Rotate(limit=180, border_mode=cv2.BORDER_REFLECT_101, p=1.0, interpolation=cv2.INTER_NEAREST),
                 albumentations.HorizontalFlip(p=0.5)])
-        self.length = len(self.samples)
-        assert group in ['train', 'validation']
-        if split_by_indexes is None:
-            assert train_split_ratio < 1 and train_split_ratio > 0
-            random.seed(seed)
-            indexes = list(range(self.length))
-            random.shuffle(indexes)
-            size = int(train_split_ratio * self.length)
-            if group == 'train':
-                self.indexes = indexes[:size]
-            else:
-                self.indexes = indexes[size:]
-            if use_uniprot_embedding:
-                self.indexes = list(filter(lambda i: i in uniprot_indexes, self.indexes))
-        else:
-            assert train_split_ratio is None, "train_split_ratio should be None when split_by_indexes is used"
-            with open(split_by_indexes, "r") as in_file:
-                idcs = json.load(in_file)
-            # assert len(self.samples) == len(idcs['train']) + len(idcs['validation'])
-            self.indexes = list(filter(lambda i: i < self.length, idcs[group]))
-            if use_uniprot_embedding:
-                self.indexes = list(filter(lambda i: i in uniprot_indexes, self.indexes))
         print(f"Dataset group: {group}, length: {len(self.indexes)}, image channels: {self.channels or [0, 1, 2]}")
 
     def __len__(self):
@@ -526,5 +529,4 @@ if __name__ == "__main__":
     # HPACombineDatasetMetadataInMemory.generate_cache(f"{HPA_DATA_ROOT}/HPACombineDatasetMetadataInMemory-256-1000.pickle", size=256, total_length=1000)
     # HPACombineDatasetMetadataInMemory.generate_cache(f"{HPA_DATA_ROOT}/HPACombineDatasetMetadataInMemory-256-1000-t5.pickle", size=256, total_length=1000, protein_embedding="t5")
     HPACombineDatasetMetadataInMemory.generate_cache(f"{HPA_DATA_ROOT}/HPACombineDatasetMetadataInMemory-256-t5.pickle", size=256, protein_embedding="t5")
-    # HPACombineDatasetMetadataInMemory.generate_cache(f"{HPA_DATA_ROOT}/HPACombineDatasetMetadataInMemory-256-t5.pickle", size=256, protein_embedding="t5")
     # dump_info(f"{HPA_DATA_ROOT}/HPACombineDatasetInfo.pickle")

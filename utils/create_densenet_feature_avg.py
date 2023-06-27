@@ -14,12 +14,14 @@ def main():
 
     for index in tqdm(range(TOTAL_LENGTH), total=TOTAL_LENGTH):
         key, desenet = next(dataset_iter)
+        assert desenet.shape == (1, 1024)
         densent_features.append(desenet)
 
-    with open("/data/wei/hpa-webdataset-all-composite/HPACombineDatasetInfo-densenet-features.pickle", "wb") as f:
-        pickle.dump(np.concatenate(densent_features, axis=0), f)
+    # with open("/data/wei/hpa-webdataset-all-composite/HPACombineDatasetInfo-densenet-features.pickle", "wb") as f:
+    #     pickle.dump(np.concatenate(densent_features, axis=0), f)
 
     densent_features = np.concatenate(densent_features, axis=0)
+    assert desenet.shape == (TOTAL_LENGTH, 1024)
 
     url = "/data/wei/hpa-webdataset-all-composite/webdataset_info.tar"
     info_dataset = wds.WebDataset(url).decode().to_tuple("__key__", "info.json")
@@ -69,12 +71,12 @@ def main():
             assert index in ensembl_ids[gid]
             densent_features_avg.append(densent_features[ids].mean(axis=0))
 
-    with open("/data/wei/hpa-webdataset-all-composite/HPACombineDatasetInfo-indexes-densenet-features-avg.json", "w") as f:
-        # write the indexes of multi avg embeddings into a json file
-        json.dump(multi_avg_embeddings, f)
+    # with open("/data/wei/hpa-webdataset-all-composite/HPACombineDatasetInfo-indexes-densenet-features-avg.json", "w") as f:
+    #     # write the indexes of multi avg embeddings into a json file
+    #     json.dump(multi_avg_embeddings, f)
 
-    with open("/data/wei/hpa-webdataset-all-composite/HPACombineDatasetInfo-densenet-features-avg.pickle", "wb") as f:
-        pickle.dump(densent_features_avg, f)
+    # with open("/data/wei/hpa-webdataset-all-composite/HPACombineDatasetInfo-densenet-features-avg.pickle", "wb") as f:
+    #     pickle.dump(densent_features_avg, f)
     
     print('all done')
     print(TOTAL_LENGTH - len(multi_avg_embeddings))
