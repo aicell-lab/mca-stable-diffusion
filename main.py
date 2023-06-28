@@ -390,11 +390,14 @@ class ImageLogger(Callback):
         return False
 
     def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx):
+        print(f"In on_train_batch_end, batch_idx {batch_idx}")
         if not self.disabled and (pl_module.global_step > 0 or self.log_first_step):
             self.log_img(pl_module, batch, batch_idx, split="train")
 
     def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx):
+        print(f"In on_validation_batch_end, batch_idx {batch_idx}")
         if self.log_validation and batch_idx % self.val_batch_frequency == 0 and not self.disabled and pl_module.global_step > 0:
+            print(f"Logging images for batch_idx {batch_idx}")
             self.log_img(pl_module, batch, batch_idx, split="val")
         if hasattr(pl_module, 'calibrate_grad_norm'):
             if (pl_module.calibrate_grad_norm and batch_idx % 25 == 0) and batch_idx > 0:

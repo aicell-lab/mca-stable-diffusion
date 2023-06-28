@@ -1269,7 +1269,7 @@ class LatentDiffusion(DDPM):
 
     @torch.no_grad()
     def sample_log(self,cond,batch_size,ddim, ddim_steps,**kwargs):
-
+        # main.py(401)on_validation_batch_end() -> main.py(362)log_img() -> ddpm.py(1371)log_images() -> ddpm.py(1273)sample_log()
         if ddim:
             ddim_sampler = DDIMSampler(self)
             shape = (self.channels, self.image_size, self.image_size)
