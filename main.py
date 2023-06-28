@@ -1,4 +1,5 @@
 import argparse, os, sys, datetime, glob
+from contextlib import redirect_stderr, redirect_stdout
 import numpy as np
 import torch
 import pytorch_lightning as pl
@@ -121,104 +122,7 @@ class DataModuleFromConfig(pl.LightningDataModule):
                           num_workers=self.num_workers, worker_init_fn=init_fn)
 
 
-if __name__ == "__main__":
-    # custom parser to specify config files, train, test and debug mode,
-    # postfix, resume.
-    # `--key value` arguments are interpreted as arguments to the trainer.
-    # `nested.key=value` arguments are interpreted as config parameters.
-    # configs are merged from left-to-right followed by command line parameters.
-
-    # model:
-    #   base_learning_rate: float
-    #   target: path to lightning module
-    #   params:
-    #       key: value
-    # data:
-    #   target: main.DataModuleFromConfig
-    #   params:
-    #      batch_size: int
-    #      wrap: bool
-    #      train:
-    #          target: path to train dataset
-    #          params:
-    #              key: value
-    #      validation:
-    #          target: path to validation dataset
-    #          params:
-    #              key: value
-    #      test:
-    #          target: path to test dataset
-    #          params:
-    #              key: value
-    # lightning: (optional, has sane defaults and can be specified on cmdline)
-    #   trainer:
-    #       additional arguments to trainer
-    #   logger:
-    #       logger to instantiate
-    #   modelcheckpoint:
-    #       modelcheckpoint to instantiate
-    #   callbacks:
-    #       callback1:
-    #           target: importpath
-    #           params:
-    #               key: value
-
-    now = datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
-
-    # add cwd for convenience and to make classes in this file available when
-    # running as `python main.py`
-    # (in particular `main.DataModuleFromConfig`)
-    sys.path.append(os.getcwd())
-
-    parser = get_parser()
-    parser = Trainer.add_argparse_args(parser)
-
-    opt, unknown = parser.parse_known_args()
-    if opt.name and opt.resume:
-        raise ValueError(
-            "-n/--name and -r/--resume cannot be specified both."
-            "If you want to resume training in a new log folder, "
-            "use -n/--name in combination with --resume_from_checkpoint"
-        )
-    if opt.resume:
-        if not os.path.exists(opt.resume):
-            raise ValueError("Cannot find {}".format(opt.resume))
-        if os.path.isfile(opt.resume):
-            paths = opt.resume.split("/")
-            # idx = len(paths)-paths[::-1].index("logs")+1
-            # logdir = "/".join(paths[:idx])
-            logdir = "/".join(paths[:-2])
-            ckpt = opt.resume
-        else:
-            assert os.path.isdir(opt.resume), opt.resume
-            logdir = opt.resume.rstrip("/")
-            ckpt = os.path.join(logdir, "checkpoints", "last.ckpt")
-
-        opt.resume_from_checkpoint = ckpt
-        base_configs = sorted(glob.glob(os.path.join(logdir, "configs/*.yaml")))
-        opt.base = base_configs + opt.base
-        _tmp = logdir.split("/")
-        nowname = _tmp[-1]
-    else:
-        if opt.name:
-            name = "_" + opt.name
-        elif opt.base:
-            cfg_fname = os.path.split(opt.base[0])[-1]
-            cfg_name = os.path.splitext(cfg_fname)[0]
-            name = "_" + cfg_name
-        else:
-            name = ""
-        nowname = now + name + opt.postfix
-        logdir = os.path.join(opt.logdir, "debug_logs" if opt.debug else "logs", nowname)
-        os.makedirs(logdir)
-
-    n_log_files = 0
-    for filename in os.listdir(logdir):
-        if filename.startswith("log"):
-            n_log_files += 1
-    log_filename = os.path.join(opt.logdir, f"log{n_log_files}.txt")
-    
-
+def main(opt, logdir):
     ckptdir = os.path.join(logdir, "checkpoints")
     cfgdir = os.path.join(logdir, "configs")
     seed_everything(opt.seed)
@@ -456,3 +360,109 @@ if __name__ == "__main__":
         os.rename(logdir, dst)
     if trainer.global_rank == 0:
         print(trainer.profiler.summary())
+
+
+if __name__ == "__main__":
+    # custom parser to specify config files, train, test and debug mode,
+    # postfix, resume.
+    # `--key value` arguments are interpreted as arguments to the trainer.
+    # `nested.key=value` arguments are interpreted as config parameters.
+    # configs are merged from left-to-right followed by command line parameters.
+
+    # model:
+    #   base_learning_rate: float
+    #   target: path to lightning module
+    #   params:
+    #       key: value
+    # data:
+    #   target: main.DataModuleFromConfig
+    #   params:
+    #      batch_size: int
+    #      wrap: bool
+    #      train:
+    #          target: path to train dataset
+    #          params:
+    #              key: value
+    #      validation:
+    #          target: path to validation dataset
+    #          params:
+    #              key: value
+    #      test:
+    #          target: path to test dataset
+    #          params:
+    #              key: value
+    # lightning: (optional, has sane defaults and can be specified on cmdline)
+    #   trainer:
+    #       additional arguments to trainer
+    #   logger:
+    #       logger to instantiate
+    #   modelcheckpoint:
+    #       modelcheckpoint to instantiate
+    #   callbacks:
+    #       callback1:
+    #           target: importpath
+    #           params:
+    #               key: value
+
+    now = datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
+
+    # add cwd for convenience and to make classes in this file available when
+    # running as `python main.py`
+    # (in particular `main.DataModuleFromConfig`)
+    sys.path.append(os.getcwd())
+
+    parser = get_parser()
+    parser = Trainer.add_argparse_args(parser)
+
+    opt, unknown = parser.parse_known_args()
+    if opt.name and opt.resume:
+        raise ValueError(
+            "-n/--name and -r/--resume cannot be specified both."
+            "If you want to resume training in a new log folder, "
+            "use -n/--name in combination with --resume_from_checkpoint"
+        )
+    if opt.resume:
+        if not os.path.exists(opt.resume):
+            raise ValueError("Cannot find {}".format(opt.resume))
+        if os.path.isfile(opt.resume):
+            paths = opt.resume.split("/")
+            # idx = len(paths)-paths[::-1].index("logs")+1
+            # logdir = "/".join(paths[:idx])
+            logdir = "/".join(paths[:-2])
+            ckpt = opt.resume
+        else:
+            assert os.path.isdir(opt.resume), opt.resume
+            logdir = opt.resume.rstrip("/")
+            ckpt = os.path.join(logdir, "checkpoints", "last.ckpt")
+
+        opt.resume_from_checkpoint = ckpt
+        base_configs = sorted(glob.glob(os.path.join(logdir, "configs/*.yaml")))
+        opt.base = base_configs + opt.base
+        _tmp = logdir.split("/")
+        nowname = _tmp[-1]
+    else:
+        if opt.name:
+            name = "_" + opt.name
+        elif opt.base:
+            cfg_fname = os.path.split(opt.base[0])[-1]
+            cfg_name = os.path.splitext(cfg_fname)[0]
+            name = "_" + cfg_name
+        else:
+            name = ""
+        nowname = now + name + opt.postfix
+        logdir = os.path.join(opt.logdir, "debug_logs" if opt.debug else "logs", nowname)
+        os.makedirs(logdir)
+
+    if opt.debug:
+        main(opt, logdir)
+    else:
+        n_log_files = 0
+        for filename in os.listdir(logdir):
+            if filename.startswith("log"):
+                n_log_files += 1
+        log_filename = os.path.join(logdir, f"log{n_log_files}.txt")
+        with open(log_filename, 'w') as f:
+            with redirect_stdout(f):
+                with redirect_stderr(f):
+                    print(f'Redirecting stdout and stderr to {log_filename}...')
+                    main(opt, logdir)
