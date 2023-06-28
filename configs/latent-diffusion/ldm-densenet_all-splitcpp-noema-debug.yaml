@@ -150,7 +150,7 @@ data:
 lightning:
   callbacks:
     image_logger:
-      target: main.ImageLogger
+      target: ldm.callbacks.ImageLogger
       params:
         batch_frequency: 1000
         log_validation: true
