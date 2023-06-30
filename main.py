@@ -122,7 +122,7 @@ class DataModuleFromConfig(pl.LightningDataModule):
                           num_workers=self.num_workers, worker_init_fn=init_fn)
 
 
-def main(opt, logdir):
+def main(opt, logdir, nowname):
     ckptdir = os.path.join(logdir, "checkpoints")
     cfgdir = os.path.join(logdir, "configs")
     seed_everything(opt.seed)
@@ -454,15 +454,11 @@ if __name__ == "__main__":
         os.makedirs(logdir)
 
     if opt.debug:
-        main(opt, logdir)
+        main(opt, logdir, nowname)
     else:
-        n_log_files = 0
-        for filename in os.listdir(logdir):
-            if filename.startswith("log"):
-                n_log_files += 1
-        log_filename = os.path.join(logdir, f"log{n_log_files}.txt")
+        log_filename = os.path.join(logdir, f"{now}-log.txt")
         with open(log_filename, 'w') as f:
             with redirect_stdout(f):
                 with redirect_stderr(f):
                     print(f'Redirecting stdout and stderr to {log_filename}...')
-                    main(opt, logdir)
+                    main(opt, logdir, nowname)

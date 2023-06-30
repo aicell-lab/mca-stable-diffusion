@@ -234,7 +234,9 @@ class HPACombineDatasetMetadataInMemory():
                 pickle.dump(self.samples, fp)
 
         self.include_densenet_embedding = include_densenet_embedding
-        self.channels = channels
+        self.channels = None if channels is None else np.array(channels)
+        self.samples = np.array(self.samples)
+        self.indexes = np.array(self.indexes)
         assert "info" in self.samples[0]
 
         self.include_location = include_location
@@ -244,7 +246,7 @@ class HPACombineDatasetMetadataInMemory():
             self.preprocessor = albumentations.Compose(
                 [albumentations.Rotate(limit=180, border_mode=cv2.BORDER_REFLECT_101, p=1.0, interpolation=cv2.INTER_NEAREST),
                 albumentations.HorizontalFlip(p=0.5)])
-        print(f"Dataset group: {group}, length: {len(self.indexes)}, image channels: {self.channels or [0, 1, 2]}")
+        print(f"Dataset group: {group}, length: {len(self.indexes)}, image channels: {channels or [0, 1, 2]}")
 
     def filter_and_split(self, train_split_ratio, split_by_indexes, seed, filter_func):
         # Construct / Load train and validation indices
@@ -322,19 +324,6 @@ class HPACombineDatasetMetadataInMemory():
                 densent_features_avg.append(avg_emd)
         print(f"There are {zero_emd_count} images with a zero avg densenet embedding.")
 
-        # with open("/data/wei/hpa-webdataset-all-composite/HPACombineDatasetInfo-indexes-densenet-features-avg.json", "r") as f:
-        #     multi_avg_embeddings = json.load(f)
-        # with open("/data/wei/hpa-webdataset-all-composite/HPACombineDatasetInfo-densenet-features-avg.pickle", "rb") as f:
-        #     densent_features_avg = pickle.load(f)
-
-        # sample_count = len(self.samples)
-        # # debug cache file example: HPACombineDatasetMetadataInMemory-256-1000-t5.pickle
-        # if "-1000" not in cache_file:
-        #     assert sample_count == len(densent_features_avg)
-        # # for debug, we have less samples in the samples
-        # if len(densent_features_avg)> sample_count:
-        #     multi_avg_embeddings = [idx for idx in multi_avg_embeddings if idx < sample_count]
-        
         return densent_features_avg
 
     def __len__(self):
@@ -342,7 +331,7 @@ class HPACombineDatasetMetadataInMemory():
 
     def __getitem__(self, i):
         sample = self.samples[self.indexes[i]].copy()
-        if self.channels:
+        if self.channels is not None:
             sample['image'] = sample['image'][:, :, self.channels]
         info = sample["info"]
         sample["condition_caption"] = f"{info['gene_names']}/{info['atlas_name']}"
