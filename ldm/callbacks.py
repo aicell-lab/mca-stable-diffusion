@@ -1,13 +1,15 @@
+from __future__ import annotations
+from collections import defaultdict
 import os
 import numpy as np
 import time
 import torch
 import torchvision
 import pytorch_lightning as pl
-
+from tabulate import tabulate
 from omegaconf import OmegaConf
 from PIL import Image
-
+import psutil
 from pytorch_lightning.callbacks import Callback
 from pytorch_lightning.utilities.distributed import rank_zero_only
 from pytorch_lightning.utilities import rank_zero_info
@@ -191,8 +193,6 @@ class ImageLogger(Callback):
             else:
                 self._last_val_loss = val
 
-        
-        
 
 class CUDACallback(Callback):
     # see https://github.com/SeanNaren/minGPT/blob/master/mingpt/callback.py
@@ -215,3 +215,71 @@ class CUDACallback(Callback):
             rank_zero_info(f"Average Peak memory {max_memory:.2f}MiB")
         except AttributeError:
             pass
+
+
+def get_mem_info(pid: int) -> dict[str, int]:
+    res = defaultdict(int)
+    for mmap in psutil.Process(pid).memory_maps():
+        res['rss'] += mmap.rss
+        res['pss'] += mmap.pss
+        res['uss'] += mmap.private_clean + mmap.private_dirty
+        res['shared'] += mmap.shared_clean + mmap.shared_dirty
+    if mmap.path.startswith('/'):
+        res['shared_file'] += mmap.shared_clean + mmap.shared_dirty
+    return res
+
+
+class CPUMemoryMonitor(Callback):
+    def __init__(self, pids: list[int] = None):
+        if pids is None:
+            pids = [os.getpid()]
+        self.pids = pids
+
+    def add_pid(self, pid: int):
+        assert pid not in self.pids
+        self.pids.append(pid)
+
+    def _refresh(self):
+        self.data = {pid: get_mem_info(pid) for pid in self.pids}
+        return self.data
+
+    def table(self) -> str:
+        self._refresh()
+        table = []
+        keys = list(list(self.data.values())[0].keys())
+        now = str(int(time.perf_counter() % 1e5))
+        for pid, data in self.data.items():
+            table.append((now, str(pid)) + tuple(self.format(data[k]) for k in keys))
+        return tabulate(table, headers=["time", "PID"] + keys)
+
+    def str(self):
+        self._refresh()
+        keys = list(list(self.data.values())[0].keys())
+        res = []
+        for pid in self.pids:
+            s = f"PID={pid}"
+            for k in keys:
+                v = self.format(self.data[pid][k])
+                s += f", {k}={v}"
+            res.append(s)
+        return "\n".join(res)
+
+    @staticmethod
+    def format(size: int) -> str:
+        for unit in ('', 'K', 'M', 'G'):
+            if size < 1024:
+                break
+            size /= 1024.0
+        return "%.1f%s" % (size, unit)
+  
+    def on_train_epoch_start(self, trainer, pl_module):
+        print("Start of training epoch", self.str())
+
+    def on_train_epoch_end(self, trainer, pl_module):
+        print("End of training epoch", self.str())
+
+    def on_validation_epoch_start(self, trainer, pl_module):
+        print("Start of validation epoch", self.str())
+
+    def on_validation_epoch_end(self, trainer, pl_module):
+        print("End of validation epoch", self.str())

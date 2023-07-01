@@ -243,6 +243,9 @@ def main(opt, logdir, nowname):
         "cuda_callback": {
             "target": "ldm.callbacks.CUDACallback"
         },
+        "cpu_mem_monitor": {
+            "target": "ldm.callbacks.CPUMemoryMonitor"
+        },
     }
     if version.parse(pl.__version__) >= version.parse('1.4.0'):
         default_callbacks_cfg.update({'checkpoint_callback': modelckpt_cfg})
