@@ -26,6 +26,8 @@ try:
 except:
    import pickle
 
+from ldm.data.serialize import TorchSerializedList
+
 HPA_DATA_ROOT = os.environ.get("HPA_DATA_ROOT", "/data/wei/hpa-webdataset-all-composite")
 
 class HPACombineDataset(Dataset):
@@ -235,8 +237,8 @@ class HPACombineDatasetMetadataInMemory():
 
         self.include_densenet_embedding = include_densenet_embedding
         self.channels = None if channels is None else np.array(channels)
-        self.samples = np.array(self.samples)
-        self.indexes = np.array(self.indexes)
+        self.samples = TorchSerializedList(self.samples)
+        self.indexes = TorchSerializedList(self.indexes)
         assert "info" in self.samples[0]
 
         self.include_location = include_location
@@ -353,123 +355,123 @@ class HPACombineDatasetMetadataInMemory():
         return sample
 
 
-class HPACombineDatasetSR(Dataset):
-    def __init__(self, filename, size=None, length=80000, channels=None,
-                 degradation=None, downscale_f=4, min_crop_f=0.5, max_crop_f=1.,
-                 random_crop=True, protein_embedding="bert"):
-        """
-        Imagenet Superresolution Dataloader
-        Performs following ops in order:
-        1.  crops a crop of size s from image either as random or center crop
-        2.  resizes crop to size with cv2.area_interpolation
-        3.  degrades resized crop with degradation_fn
+# class HPACombineDatasetSR(Dataset):
+#     def __init__(self, filename, size=None, length=80000, channels=None,
+#                  degradation=None, downscale_f=4, min_crop_f=0.5, max_crop_f=1.,
+#                  random_crop=True, protein_embedding="bert"):
+#         """
+#         Imagenet Superresolution Dataloader
+#         Performs following ops in order:
+#         1.  crops a crop of size s from image either as random or center crop
+#         2.  resizes crop to size with cv2.area_interpolation
+#         3.  degrades resized crop with degradation_fn
 
-        :param size: resizing to size after cropping
-        :param degradation: degradation_fn, e.g. cv_bicubic or bsrgan_light
-        :param downscale_f: Low Resolution Downsample factor
-        :param min_crop_f: determines crop size s,
-          where s = c * min_img_side_len with c sampled from interval (min_crop_f, max_crop_f)
-        :param max_crop_f: ""
-        :param data_root:
-        :param random_crop:
-        """
-        if channels is None:
-            self.channels = [0, 1, 2]
-        else:
-            self.channels = channels
-        self.base = HPACombineDataset(filename, include_metadata=False, length=length, protein_embedding=protein_embedding)
-        assert size
-        assert (size / downscale_f).is_integer()
-        self.size = size
-        self.LR_size = int(size / downscale_f)
-        self.min_crop_f = min_crop_f
-        self.max_crop_f = max_crop_f
-        assert(max_crop_f <= 1.)
-        self.center_crop = not random_crop
+#         :param size: resizing to size after cropping
+#         :param degradation: degradation_fn, e.g. cv_bicubic or bsrgan_light
+#         :param downscale_f: Low Resolution Downsample factor
+#         :param min_crop_f: determines crop size s,
+#           where s = c * min_img_side_len with c sampled from interval (min_crop_f, max_crop_f)
+#         :param max_crop_f: ""
+#         :param data_root:
+#         :param random_crop:
+#         """
+#         if channels is None:
+#             self.channels = [0, 1, 2]
+#         else:
+#             self.channels = channels
+#         self.base = HPACombineDataset(filename, include_metadata=False, length=length, protein_embedding=protein_embedding)
+#         assert size
+#         assert (size / downscale_f).is_integer()
+#         self.size = size
+#         self.LR_size = int(size / downscale_f)
+#         self.min_crop_f = min_crop_f
+#         self.max_crop_f = max_crop_f
+#         assert(max_crop_f <= 1.)
+#         self.center_crop = not random_crop
 
-        self.image_rescaler = albumentations.SmallestMaxSize(max_size=size, interpolation=cv2.INTER_AREA)
+#         self.image_rescaler = albumentations.SmallestMaxSize(max_size=size, interpolation=cv2.INTER_AREA)
 
-        self.pil_interpolation = False # gets reset later if incase interp_op is from pillow
+#         self.pil_interpolation = False # gets reset later if incase interp_op is from pillow
 
-        if degradation == "bsrgan":
-            self.degradation_process = partial(degradation_fn_bsr, sf=downscale_f)
+#         if degradation == "bsrgan":
+#             self.degradation_process = partial(degradation_fn_bsr, sf=downscale_f)
 
-        elif degradation == "bsrgan_light":
-            self.degradation_process = partial(degradation_fn_bsr_light, sf=downscale_f)
+#         elif degradation == "bsrgan_light":
+#             self.degradation_process = partial(degradation_fn_bsr_light, sf=downscale_f)
 
-        else:
-            interpolation_fn = {
-            "cv_nearest": cv2.INTER_NEAREST,
-            "cv_bilinear": cv2.INTER_LINEAR,
-            "cv_bicubic": cv2.INTER_CUBIC,
-            "cv_area": cv2.INTER_AREA,
-            "cv_lanczos": cv2.INTER_LANCZOS4,
-            "pil_nearest": PIL.Image.NEAREST,
-            "pil_bilinear": PIL.Image.BILINEAR,
-            "pil_bicubic": PIL.Image.BICUBIC,
-            "pil_box": PIL.Image.BOX,
-            "pil_hamming": PIL.Image.HAMMING,
-            "pil_lanczos": PIL.Image.LANCZOS,
-            }[degradation]
+#         else:
+#             interpolation_fn = {
+#             "cv_nearest": cv2.INTER_NEAREST,
+#             "cv_bilinear": cv2.INTER_LINEAR,
+#             "cv_bicubic": cv2.INTER_CUBIC,
+#             "cv_area": cv2.INTER_AREA,
+#             "cv_lanczos": cv2.INTER_LANCZOS4,
+#             "pil_nearest": PIL.Image.NEAREST,
+#             "pil_bilinear": PIL.Image.BILINEAR,
+#             "pil_bicubic": PIL.Image.BICUBIC,
+#             "pil_box": PIL.Image.BOX,
+#             "pil_hamming": PIL.Image.HAMMING,
+#             "pil_lanczos": PIL.Image.LANCZOS,
+#             }[degradation]
             
 
-            self.pil_interpolation = degradation.startswith("pil_")
+#             self.pil_interpolation = degradation.startswith("pil_")
 
-            if self.pil_interpolation:
-                self.degradation_process = partial(TF.resize, size=self.LR_size, interpolation=TF.InterpolationMode.NEAREST)
+#             if self.pil_interpolation:
+#                 self.degradation_process = partial(TF.resize, size=self.LR_size, interpolation=TF.InterpolationMode.NEAREST)
 
-            else:
-                self.degradation_process = albumentations.SmallestMaxSize(max_size=self.LR_size,
-                                                                          interpolation=interpolation_fn)
+#             else:
+#                 self.degradation_process = albumentations.SmallestMaxSize(max_size=self.LR_size,
+#                                                                           interpolation=interpolation_fn)
 
-    def __len__(self):
-        return len(self.base)
+#     def __len__(self):
+#         return len(self.base)
 
-    def __getitem__(self, i):
-        example = self.base[i]
-        image = example["image"]
-        image = image[:, :, self.channels]
+#     def __getitem__(self, i):
+#         example = self.base[i]
+#         image = example["image"]
+#         image = image[:, :, self.channels]
 
-        min_side_len = min(image.shape[:2])
-        crop_side_len = min_side_len * np.random.uniform(self.min_crop_f, self.max_crop_f, size=None)
-        crop_side_len = int(crop_side_len)
+#         min_side_len = min(image.shape[:2])
+#         crop_side_len = min_side_len * np.random.uniform(self.min_crop_f, self.max_crop_f, size=None)
+#         crop_side_len = int(crop_side_len)
 
-        if self.center_crop:
-            self.cropper = albumentations.CenterCrop(height=crop_side_len, width=crop_side_len)
+#         if self.center_crop:
+#             self.cropper = albumentations.CenterCrop(height=crop_side_len, width=crop_side_len)
 
-        else:
-            self.cropper = albumentations.RandomCrop(height=crop_side_len, width=crop_side_len)
+#         else:
+#             self.cropper = albumentations.RandomCrop(height=crop_side_len, width=crop_side_len)
 
-        image = self.cropper(image=image)["image"]
-        image = self.image_rescaler(image=image)["image"]
+#         image = self.cropper(image=image)["image"]
+#         image = self.image_rescaler(image=image)["image"]
 
-        if self.pil_interpolation:
-            image_pil = PIL.Image.fromarray(image)
-            LR_image = self.degradation_process(image_pil)
-            LR_image = np.array(LR_image).astype(np.uint8)
+#         if self.pil_interpolation:
+#             image_pil = PIL.Image.fromarray(image)
+#             LR_image = self.degradation_process(image_pil)
+#             LR_image = np.array(LR_image).astype(np.uint8)
 
-        else:
-            LR_image = self.degradation_process(image=image)["image"]
+#         else:
+#             LR_image = self.degradation_process(image=image)["image"]
 
-        example["image"] = (image/127.5 - 1.0).astype(np.float32)
-        example["LR_image"] = (LR_image/127.5 - 1.0).astype(np.float32)
+#         example["image"] = (image/127.5 - 1.0).astype(np.float32)
+#         example["LR_image"] = (LR_image/127.5 - 1.0).astype(np.float32)
 
-        return example
+#         return example
     
 
-class ClassEmbedder(nn.Module):
-    def __init__(self, embed_dim, n_classes=1000, key='class'):
-        super().__init__()
-        self.key = key
-        self.embedding = nn.Embedding(n_classes, embed_dim)
+# class ClassEmbedder(nn.Module):
+#     def __init__(self, embed_dim, n_classes=1000, key='class'):
+#         super().__init__()
+#         self.key = key
+#         self.embedding = nn.Embedding(n_classes, embed_dim)
 
-    def forward(self, batch, key=None):
-        if key is None:
-            key = self.key
-        # this is for use in crossattn
-        c = batch[key][:, None]
-        c = self.embedding(c)
-        return c
+#     def forward(self, batch, key=None):
+#         if key is None:
+#             key = self.key
+#         # this is for use in crossattn
+#         c = batch[key][:, None]
+#         c = self.embedding(c)
+#         return c
 
 class HPAClassEmbedder(nn.Module):
     def __init__(self, include_location=False, include_ref_image=False, include_cellline=True, include_embed=False, use_loc_embedding=True, image_embedding_model=None, include_densenet_embedding=False):
@@ -530,39 +532,39 @@ class HPAClassEmbedder(nn.Module):
         return condition_grid
 
 
-class HPAHybridEmbedder(nn.Module):
-    def __init__(self, image_embedding_model, include_location=False):
-        super().__init__()
-        assert not isinstance(image_embedding_model, dict)
-        self.image_embedding_model = instantiate_from_config(image_embedding_model)
-        self.include_location = include_location
+# class HPAHybridEmbedder(nn.Module):
+#     def __init__(self, image_embedding_model, include_location=False):
+#         super().__init__()
+#         assert not isinstance(image_embedding_model, dict)
+#         self.image_embedding_model = instantiate_from_config(image_embedding_model)
+#         self.include_location = include_location
 
-    def forward(self, batch, key=None):
-        image = batch["ref-image"]
-        assert image.shape[3] == 3
-        image = rearrange(image, 'b h w c -> b c h w').contiguous()
-        with torch.no_grad():
-            img_embed = self.image_embedding_model.encode(image)
-        if torch.any(torch.isnan(img_embed)):
-            raise Exception("NAN values encountered in the image embedding")
-        embed = batch["embed"]
-        celline = batch["cell-line"]
-        cross_embed = [embed, celline]
-        if self.include_location:
-            cross_embed.append(batch["location_classes"])
-        return {"c_concat": [img_embed], "c_crossattn": cross_embed}
+#     def forward(self, batch, key=None):
+#         image = batch["ref-image"]
+#         assert image.shape[3] == 3
+#         image = rearrange(image, 'b h w c -> b c h w').contiguous()
+#         with torch.no_grad():
+#             img_embed = self.image_embedding_model.encode(image)
+#         if torch.any(torch.isnan(img_embed)):
+#             raise Exception("NAN values encountered in the image embedding")
+#         embed = batch["embed"]
+#         celline = batch["cell-line"]
+#         cross_embed = [embed, celline]
+#         if self.include_location:
+#             cross_embed.append(batch["location_classes"])
+#         return {"c_concat": [img_embed], "c_crossattn": cross_embed}
     
-    def decode(self, c):
-        condition_row = c['c_concat']
-        assert len(condition_row) == 1
-        with torch.no_grad():
-            condition_rec_row = [self.image_embedding_model.decode(cond) for cond in condition_row]
-        n_imgs_per_row = len(condition_rec_row)
-        condition_rec_row = torch.stack(condition_rec_row)  # n_log_step, n_row, C, H, W
-        condition_grid = rearrange(condition_rec_row, 'n b c h w -> b n c h w')
-        condition_grid = rearrange(condition_grid, 'b n c h w -> (b n) c h w')
-        condition_grid = make_grid(condition_grid, nrow=n_imgs_per_row)
-        return condition_grid
+#     def decode(self, c):
+#         condition_row = c['c_concat']
+#         assert len(condition_row) == 1
+#         with torch.no_grad():
+#             condition_rec_row = [self.image_embedding_model.decode(cond) for cond in condition_row]
+#         n_imgs_per_row = len(condition_rec_row)
+#         condition_rec_row = torch.stack(condition_rec_row)  # n_log_step, n_row, C, H, W
+#         condition_grid = rearrange(condition_rec_row, 'n b c h w -> b n c h w')
+#         condition_grid = rearrange(condition_grid, 'b n c h w -> (b n) c h w')
+#         condition_grid = make_grid(condition_grid, nrow=n_imgs_per_row)
+#         return condition_grid
 
 
 if __name__ == "__main__":

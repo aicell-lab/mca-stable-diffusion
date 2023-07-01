@@ -1,4 +1,4 @@
-import argparse, os, sys, datetime, glob
+import argparse, os, sys, datetime, glob, socket, subprocess
 from contextlib import redirect_stderr, redirect_stdout
 import numpy as np
 import torch
@@ -14,6 +14,8 @@ from pytorch_lightning.trainer import Trainer
 from ldm.data.base import Txt2ImgIterableBaseDataset
 from ldm.parse import get_parser, nondefault_trainer_args
 from ldm.util import instantiate_from_config, send_message_to_slack
+from memory_profiler import profile
+import wandb
 
 
 class WrappedDataset(Dataset):
@@ -87,7 +89,7 @@ class DataModuleFromConfig(pl.LightningDataModule):
             init_fn = None
         return DataLoader(self.datasets["train"], batch_size=self.batch_size,
                           num_workers=self.num_workers, shuffle=False if is_iterable_dataset else True,
-                          worker_init_fn=init_fn)
+                          worker_init_fn=init_fn, persistent_workers=self.num_workers > 0)
 
     def _val_dataloader(self, shuffle=False):
         if isinstance(self.datasets['validation'], Txt2ImgIterableBaseDataset) or self.use_worker_init_fn:
@@ -98,7 +100,7 @@ class DataModuleFromConfig(pl.LightningDataModule):
                           batch_size=self.batch_size,
                           num_workers=self.num_workers,
                           worker_init_fn=init_fn,
-                          shuffle=shuffle)
+                          shuffle=shuffle, persistent_workers=self.num_workers > 0)
 
     def _test_dataloader(self, shuffle=False):
         is_iterable_dataset = isinstance(self.datasets['train'], Txt2ImgIterableBaseDataset)
@@ -111,7 +113,7 @@ class DataModuleFromConfig(pl.LightningDataModule):
         shuffle = shuffle and (not is_iterable_dataset)
 
         return DataLoader(self.datasets["test"], batch_size=self.batch_size,
-                          num_workers=self.num_workers, worker_init_fn=init_fn, shuffle=shuffle)
+                          num_workers=self.num_workers, worker_init_fn=init_fn, shuffle=shuffle, persistent_workers=self.num_workers > 0)
 
     def _predict_dataloader(self, shuffle=False):
         if isinstance(self.datasets['predict'], Txt2ImgIterableBaseDataset) or self.use_worker_init_fn:
@@ -119,9 +121,9 @@ class DataModuleFromConfig(pl.LightningDataModule):
         else:
             init_fn = None
         return DataLoader(self.datasets["predict"], batch_size=self.batch_size,
-                          num_workers=self.num_workers, worker_init_fn=init_fn)
+                          num_workers=self.num_workers, worker_init_fn=init_fn, persistent_workers=self.num_workers > 0)
 
-
+@profile
 def main(opt, logdir, nowname):
     ckptdir = os.path.join(logdir, "checkpoints")
     cfgdir = os.path.join(logdir, "configs")
@@ -415,6 +417,11 @@ if __name__ == "__main__":
     parser = Trainer.add_argparse_args(parser)
 
     opt, unknown = parser.parse_known_args()
+    opt.now = now
+    opt.hostname = socket.gethostname()
+    opt.pid = os.getpid()
+    opt.screen = subprocess.check_output('echo $STY', shell=True).decode('utf').strip()
+
     if opt.name and opt.resume:
         raise ValueError(
             "-n/--name and -r/--resume cannot be specified both."
@@ -452,7 +459,7 @@ if __name__ == "__main__":
         nowname = now + name + opt.postfix
         logdir = os.path.join(opt.logdir, "debug_logs" if opt.debug else "logs", nowname)
         os.makedirs(logdir)
-
+    wandb.init(project="super-multiplex-cell", config=opt, resume="allow", settings=wandb.Settings(start_method="fork"), name=nowname, mode="offline" if opt.debug else "online", id=nowname)
     if opt.debug:
         main(opt, logdir, nowname)
     else:

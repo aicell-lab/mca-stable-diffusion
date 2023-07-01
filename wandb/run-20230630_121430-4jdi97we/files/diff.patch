@@ -1,0 +1,31 @@
+diff --git a/main.py b/main.py
+index 3eb3244..273fb7a 100644
+--- a/main.py
++++ b/main.py
+@@ -1,4 +1,4 @@
+-import argparse, os, sys, datetime, glob
++import argparse, os, sys, datetime, glob, socket, subprocess
+ from contextlib import redirect_stderr, redirect_stdout
+ import numpy as np
+ import torch
+@@ -14,6 +14,7 @@ from pytorch_lightning.trainer import Trainer
+ from ldm.data.base import Txt2ImgIterableBaseDataset
+ from ldm.parse import get_parser, nondefault_trainer_args
+ from ldm.util import instantiate_from_config, send_message_to_slack
++import wandb
+ 
+ 
+ class WrappedDataset(Dataset):
+@@ -415,6 +416,12 @@ if __name__ == "__main__":
+     parser = Trainer.add_argparse_args(parser)
+ 
+     opt, unknown = parser.parse_known_args()
++    opt.now = now
++    opt.hostname = socket.gethostname()
++    opt.pid = os.getpid()
++    opt.screen = subprocess.check_output('echo $STY', shell=True).decode('utf')
++    wandb.init(project="super-multiplex-cell", config=opt, resume="allow", settings=wandb.Settings(start_method="fork"))
++
+     if opt.name and opt.resume:
+         raise ValueError(
+             "-n/--name and -r/--resume cannot be specified both."
