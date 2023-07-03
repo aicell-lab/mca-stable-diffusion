@@ -176,3 +176,5 @@ lightning:
     val_check_interval: 1.0
     benchmark: True
     accelerator: dp # need to change to dp because the default ddp will free the training
+    profiler: advanced
+    max_steps: 10

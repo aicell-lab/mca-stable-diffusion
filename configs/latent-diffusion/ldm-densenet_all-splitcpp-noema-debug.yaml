@@ -108,7 +108,7 @@ data:
   target: main.DataModuleFromConfig
   params:
     batch_size: 8
-    num_workers: 1
+    num_workers: 8
     wrap: False
     # train:
     #   target: ldm.data.hpa.HPACombineDatasetMetadata
@@ -176,3 +176,5 @@ lightning:
     val_check_interval: 10
     benchmark: True
     accelerator: dp # need to change to dp because the default ddp will free the training
+    # profiler: advanced
+    max_epochs: 1

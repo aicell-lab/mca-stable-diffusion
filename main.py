@@ -123,7 +123,7 @@ class DataModuleFromConfig(pl.LightningDataModule):
         return DataLoader(self.datasets["predict"], batch_size=self.batch_size,
                           num_workers=self.num_workers, worker_init_fn=init_fn, persistent_workers=self.num_workers > 0)
 
-@profile
+# @profile
 def main(opt, logdir, nowname):
     ckptdir = os.path.join(logdir, "checkpoints")
     cfgdir = os.path.join(logdir, "configs")
@@ -150,6 +150,11 @@ def main(opt, logdir, nowname):
         print(f"Running on GPUs {gpuinfo}")
         cpu = False
     trainer_opt = argparse.Namespace(**trainer_config)
+    if hasattr(trainer_opt, "profiler"):
+        if trainer_opt.profiler == "simple":
+            trainer_opt.profiler = pl.profiler.SimpleProfiler(dirpath=logdir, filename="perf_logs")
+        elif trainer_opt.profiler == "advanced":
+            trainer_opt.profiler = pl.profiler.AdvancedProfiler(dirpath=logdir, filename="perf_logs")
     lightning_config.trainer = trainer_config
 
     # model
@@ -358,11 +363,11 @@ def main(opt, logdir, nowname):
     #     raise
     # finally:
         # move newly created debug project to debug_runs
-    if opt.debug and not opt.resume and trainer.global_rank == 0:
-        dst, name = os.path.split(logdir)
-        dst = os.path.join(dst, "debug_runs", name)
-        os.makedirs(os.path.split(dst)[0], exist_ok=True)
-        os.rename(logdir, dst)
+    # if opt.debug and not opt.resume and trainer.global_rank == 0:
+    #     dst, name = os.path.split(logdir)
+    #     dst = os.path.join(dst, "debug_runs", name)
+    #     os.makedirs(os.path.split(dst)[0], exist_ok=True)
+    #     os.rename(logdir, dst)
     if trainer.global_rank == 0:
         print(trainer.profiler.summary())
 
@@ -471,4 +476,6 @@ if __name__ == "__main__":
             with redirect_stdout(f):
                 with redirect_stderr(f):
                     print(f'Redirecting stdout and stderr to {log_filename}...')
+                    print("A message to stdout...")
+                    print("A message to stderr...", file=sys.stderr)
                     main(opt, logdir, nowname)

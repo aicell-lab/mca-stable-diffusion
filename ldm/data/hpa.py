@@ -8,7 +8,7 @@ import numpy as np
 import torchvision.transforms.functional as TF
 from PIL import Image
 import time
-from tqdm import tqdm
+from tqdm import tqdm, trange
 from ldm.modules.image_degradation import degradation_fn_bsr, degradation_fn_bsr_light
 import os
 import random
@@ -167,8 +167,9 @@ def dump_info(info_pickle_path):
 
 class HPACombineDatasetMetadataInMemory():
 
+    cache_file = None
     samples_dict = {}
-    densenet_embeds = None
+    densenet_embeds_dict = {}
     
     @staticmethod
     def generate_cache(cache_file, *args, total_length=None, **kwargs):
@@ -184,28 +185,38 @@ class HPACombineDatasetMetadataInMemory():
             pickle.dump(samples, fp)
 
     def __init__(self, cache_file, seed=123, train_split_ratio=0.95, group='train', channels=None, include_location=False, include_densenet_embedding=False, return_info=False, filter_func=None, dump_to_file=None, rotate_and_flip=False, split_by_indexes=None, use_uniprot_embedding=False):
-        # Load cache
-        if cache_file in HPACombineDatasetMetadataInMemory.samples_dict:
-            self.samples = HPACombineDatasetMetadataInMemory.samples_dict[cache_file]
-        else:
-            if os.path.exists(cache_file):
-                print(f"Loading data from cache file {cache_file}, this may take a while...")
-                start_time = time.time()
-                with open(cache_file, 'rb') as fp:
-                    self.samples = pickle.load(fp)
-                time_span = time.time() - start_time
-                print(f"Cache loading is finished. Took {int(time_span)} s in total.")
-            else:
-                raise Exception(f"Cache file not found {cache_file}")
-            HPACombineDatasetMetadataInMemory.samples_dict[cache_file] = self.samples
-
         with open(f"{HPA_DATA_ROOT}/HPACombineDatasetInfo.pickle", 'rb') as fp:
             self.info_list = pickle.load(fp)
         assert len(self.info_list) == TOTAL_LENGTH
 
-        train_indexes, valid_indexes = self.filter_and_split(train_split_ratio, split_by_indexes, seed, filter_func)
+        # Load cache
+        # if cache_file in HPACombineDatasetMetadataInMemory.samples_dict:
+        #     self.samples = HPACombineDatasetMetadataInMemory.samples_dict[cache_file]
+        # else:
         assert group in ['train', 'validation']
-        self.indexes = train_indexes if group == "train" else valid_indexes
+        if self.cache_file is None:
+            self.cache_file = cache_file
+        else:
+            assert self.cache_file == cache_file
+        if group not in self.samples_dict:
+            if os.path.exists(cache_file):
+                print(f"Loading data from cache file {cache_file}, this may take a while...")
+                start_time = time.time()
+                with open(cache_file, 'rb') as fp:
+                    all_samples = pickle.load(fp)
+                time_span = time.time() - start_time
+                print(f"Cache loading is finished. Took {int(time_span)} s in total.")
+            else:
+                raise Exception(f"Cache file not found {cache_file}")
+            # HPACombineDatasetMetadataInMemory.samples_dict[cache_file] = self.samples
+
+            train_indexes, valid_indexes = self.filter_and_split(train_split_ratio, split_by_indexes, seed, filter_func, len(all_samples))
+            all_samples = np.array(all_samples)
+            self.samples_dict["train"] = all_samples[train_indexes]
+            self.samples_dict["validation"] = all_samples[valid_indexes]
+            del all_samples
+        self.samples = self.samples_dict[group]
+        self.indexes = range(len(self.samples))
 
         if use_uniprot_embedding:
             # uniprot_indexes = []
@@ -219,11 +230,17 @@ class HPACombineDatasetMetadataInMemory():
                             sample['embed'] = np.array(file[prot_id])
                                 # uniprot_indexes.append(idx)
         assert include_densenet_embedding in ["all", "flt", False]
-        if include_densenet_embedding:
-            densenet_avg_list = self.compute_avg_densenet_embeds(train_indexes, valid_indexes, include_densenet_embedding)
-            assert len(self.indexes) == len(densenet_avg_list)
-            for idx, densenet_avg in zip(self.indexes, densenet_avg_list):
-                self.samples[idx]['densent_avg'] = densenet_avg
+        if include_densenet_embedding and group not in self.densenet_embeds_dict:
+            all_densenet_avg_list = self.compute_avg_densenet_embeds(train_indexes, valid_indexes, include_densenet_embedding)
+            assert len(all_densenet_avg_list) == TOTAL_LENGTH
+            all_densenet_avg_list = np.array(all_densenet_avg_list)
+            self.densenet_embeds_dict["train"] = all_densenet_avg_list[train_indexes]
+            self.densenet_embeds_dict["validation"] = all_densenet_avg_list[valid_indexes]
+            del all_densenet_avg_list
+        densenet_embeds = self.densenet_embeds_dict[group]
+        assert len(densenet_embeds) == len(self.samples)
+        for idx, densenet_avg in enumerate(densenet_embeds):
+            self.samples[idx]['densent_avg'] = densenet_avg
             
             # self.samples = [self.samples[idx] for idx in multi_avg_embeddings]
             # if 'embed' in self.samples[0]:
@@ -250,7 +267,7 @@ class HPACombineDatasetMetadataInMemory():
                 albumentations.HorizontalFlip(p=0.5)])
         print(f"Dataset group: {group}, length: {len(self.indexes)}, image channels: {channels or [0, 1, 2]}")
 
-    def filter_and_split(self, train_split_ratio, split_by_indexes, seed, filter_func):
+    def filter_and_split(self, train_split_ratio, split_by_indexes, seed, filter_func, cache_size):
         # Construct / Load train and validation indices
         if split_by_indexes is None:
             assert train_split_ratio < 1 and train_split_ratio > 0
@@ -273,8 +290,8 @@ class HPACombineDatasetMetadataInMemory():
                 idcs = json.load(in_file)
             train_indexes = idcs["train"]
             valid_indexes = idcs["validation"]
-        train_indexes = list(filter(lambda i: i < len(self.samples), train_indexes))
-        valid_indexes = list(filter(lambda i: i < len(self.samples), valid_indexes))
+        train_indexes = list(filter(lambda i: i < cache_size, train_indexes))
+        valid_indexes = list(filter(lambda i: i < cache_size, valid_indexes))
         
         # if filter_func and split_by_indexes is None:
         if filter_func == 'has_location':
@@ -286,10 +303,10 @@ class HPACombineDatasetMetadataInMemory():
     
     def compute_avg_densenet_embeds(self, train_indexes, valid_indexes, include_densenet_embedding):
         # Load all densenet embeddings
-        if HPACombineDatasetMetadataInMemory.densenet_embeds is None:
-            with open("/data/wei/hpa-webdataset-all-composite/HPACombineDatasetInfo-densenet-features.pickle", "rb") as f:
-                HPACombineDatasetMetadataInMemory.densenet_embeds = pickle.load(f)
-            assert HPACombineDatasetMetadataInMemory.densenet_embeds.shape == (TOTAL_LENGTH, 1024)
+        # if HPACombineDatasetMetadataInMemory.densenet_embeds is None:
+        with open("/data/wei/hpa-webdataset-all-composite/HPACombineDatasetInfo-densenet-features.pickle", "rb") as f:
+            densenet_embeds = pickle.load(f)
+        assert densenet_embeds.shape == (TOTAL_LENGTH, 1024)
 
         # Group images of the same protein
         gid_to_nonvalid_imgids = {}
@@ -305,7 +322,7 @@ class HPACombineDatasetMetadataInMemory():
 
         densent_features_avg = []
         zero_emd_count = 0
-        for index in self.indexes:
+        for index in trange(TOTAL_LENGTH, desc="Calculating average densenet embeddings"):
             gid = self.info_list[index]['ensembl_ids']
             if not isinstance(gid, str):
                 # no ensembl id
@@ -321,7 +338,7 @@ class HPACombineDatasetMetadataInMemory():
                 zero_emd_count += 1
             else:
                 # multi_avg_embeddings.append(index)
-                avg_emd = HPACombineDatasetMetadataInMemory.densenet_embeds[ids].mean(axis=0)
+                avg_emd = densenet_embeds[ids].mean(axis=0)
                 assert avg_emd.sum() != 0
                 densent_features_avg.append(avg_emd)
         print(f"There are {zero_emd_count} images with a zero avg densenet embedding.")
