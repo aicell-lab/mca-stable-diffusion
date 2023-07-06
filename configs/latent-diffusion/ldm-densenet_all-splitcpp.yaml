@@ -1,5 +1,5 @@
 model:
-  base_learning_rate: 5.0e-5   # set to target_lr by starting main.py with '--scale_lr False'
+  base_learning_rate: 1.0e-6   # set to target_lr by starting main.py with '--scale_lr True'
   target: ldm.models.diffusion.ddpm.LatentDiffusion
   params:
     # ckpt_path: logs/2023-05-23T01-01-22_hpa-ldm-vq-4-hybrid-protein-densenet/checkpoints/last.ckpt
@@ -107,7 +107,7 @@ model:
 data:
   target: main.DataModuleFromConfig
   params:
-    batch_size: 4
+    batch_size: 8
     num_workers: 8
     wrap: False
     # train:
@@ -176,5 +176,4 @@ lightning:
     val_check_interval: 1.0
     benchmark: True
     accelerator: dp # need to change to dp because the default ddp will free the training
-    profiler: advanced
-    max_steps: 10
+    # profiler: simple

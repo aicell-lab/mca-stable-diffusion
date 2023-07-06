@@ -413,6 +413,7 @@ if __name__ == "__main__":
     #           target: importpath
     #           params:
     #               key: value
+    __spec__ = None
 
     now = datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
 
