@@ -89,7 +89,7 @@ class DataModuleFromConfig(pl.LightningDataModule):
             init_fn = None
         return DataLoader(self.datasets["train"], batch_size=self.batch_size,
                           num_workers=self.num_workers, shuffle=False if is_iterable_dataset else True,
-                          worker_init_fn=init_fn, persistent_workers=self.num_workers > 0)
+                          worker_init_fn=init_fn, persistent_workers=self.num_workers > 0,pin_memory=True)
 
     def _val_dataloader(self, shuffle=False):
         if isinstance(self.datasets['validation'], Txt2ImgIterableBaseDataset) or self.use_worker_init_fn:
@@ -100,7 +100,7 @@ class DataModuleFromConfig(pl.LightningDataModule):
                           batch_size=self.batch_size,
                           num_workers=self.num_workers,
                           worker_init_fn=init_fn,
-                          shuffle=shuffle, persistent_workers=self.num_workers > 0)
+                          shuffle=shuffle, persistent_workers=self.num_workers > 0, pin_memory=True)
 
     def _test_dataloader(self, shuffle=False):
         is_iterable_dataset = isinstance(self.datasets['train'], Txt2ImgIterableBaseDataset)
@@ -113,7 +113,7 @@ class DataModuleFromConfig(pl.LightningDataModule):
         shuffle = shuffle and (not is_iterable_dataset)
 
         return DataLoader(self.datasets["test"], batch_size=self.batch_size,
-                          num_workers=self.num_workers, worker_init_fn=init_fn, shuffle=shuffle, persistent_workers=self.num_workers > 0)
+                          num_workers=self.num_workers, worker_init_fn=init_fn, shuffle=shuffle, persistent_workers=self.num_workers > 0, pin_memory=True)
 
     def _predict_dataloader(self, shuffle=False):
         if isinstance(self.datasets['predict'], Txt2ImgIterableBaseDataset) or self.use_worker_init_fn:
@@ -121,7 +121,7 @@ class DataModuleFromConfig(pl.LightningDataModule):
         else:
             init_fn = None
         return DataLoader(self.datasets["predict"], batch_size=self.batch_size,
-                          num_workers=self.num_workers, worker_init_fn=init_fn, persistent_workers=self.num_workers > 0)
+                          num_workers=self.num_workers, worker_init_fn=init_fn, persistent_workers=self.num_workers > 0, pin_memory=True)
 
 # @profile
 def main(opt, logdir, nowname):

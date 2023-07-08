@@ -2,24 +2,21 @@ import webdataset as wds
 from torch.utils.data import Dataset
 import cv2
 import albumentations
-import PIL
-from functools import partial
 import numpy as np
-import torchvision.transforms.functional as TF
 from PIL import Image
-import time
 from tqdm import tqdm, trange
-from ldm.modules.image_degradation import degradation_fn_bsr, degradation_fn_bsr_light
 import os
 import random
 import torch
 import torch.nn as nn
-from functools import partial
 from einops import rearrange
 from ldm.util import instantiate_from_config
 from torchvision.utils import make_grid
 import json
 import h5py
+import deepdish as dd
+import warnings
+warnings.filterwarnings("ignore")
 
 try:
    import cPickle as pickle
@@ -168,8 +165,8 @@ def dump_info(info_pickle_path):
 class HPACombineDatasetMetadataInMemory():
 
     cache_file = None
-    samples_dict = {}
-    densenet_embeds_dict = {}
+    # samples_dict = {}
+    all_densenet_avg_list = []
     
     @staticmethod
     def generate_cache(cache_file, *args, total_length=None, **kwargs):
@@ -186,7 +183,7 @@ class HPACombineDatasetMetadataInMemory():
 
     def __init__(self, cache_file, seed=123, train_split_ratio=0.95, group='train', channels=None, include_location=False, include_densenet_embedding=False, return_info=False, filter_func=None, dump_to_file=None, rotate_and_flip=False, split_by_indexes=None, use_uniprot_embedding=False):
         with open(f"{HPA_DATA_ROOT}/HPACombineDatasetInfo.pickle", 'rb') as fp:
-            self.info_list = pickle.load(fp)
+            self.info_list = TorchSerializedList(pickle.load(fp))
         assert len(self.info_list) == TOTAL_LENGTH
 
         # Load cache
@@ -198,49 +195,32 @@ class HPACombineDatasetMetadataInMemory():
             self.cache_file = cache_file
         else:
             assert self.cache_file == cache_file
-        if group not in self.samples_dict:
-            if os.path.exists(cache_file):
-                print(f"Loading data from cache file {cache_file}, this may take a while...")
-                start_time = time.time()
-                with open(cache_file, 'rb') as fp:
-                    all_samples = pickle.load(fp)
-                time_span = time.time() - start_time
-                print(f"Cache loading is finished. Took {int(time_span)} s in total.")
-            else:
-                raise Exception(f"Cache file not found {cache_file}")
+        # if group not in self.samples_dict:
+            # if os.path.exists(cache_file):
+            #     print(f"Loading data from cache file {cache_file}, this may take a while...")
+            #     start_time = time.time()
+            #     with open(cache_file, 'rb') as fp:
+            #         all_samples = pickle.load(fp)
+            #     time_span = time.time() - start_time
+            #     print(f"Cache loading is finished. Took {int(time_span)} s in total.")
+            # else:
+            #     raise Exception(f"Cache file not found {cache_file}")
             # HPACombineDatasetMetadataInMemory.samples_dict[cache_file] = self.samples
 
-            train_indexes, valid_indexes = self.filter_and_split(train_split_ratio, split_by_indexes, seed, filter_func, len(all_samples))
-            all_samples = np.array(all_samples)
-            self.samples_dict["train"] = all_samples[train_indexes]
-            self.samples_dict["validation"] = all_samples[valid_indexes]
-            del all_samples
-        self.samples = self.samples_dict[group]
-        self.indexes = range(len(self.samples))
+        train_indexes, valid_indexes = self.filter_and_split(train_split_ratio, split_by_indexes, seed, filter_func)
+        #     all_samples = np.array(all_samples)
+        #     self.samples_dict["train"] = all_samples[train_indexes]
+        #     self.samples_dict["validation"] = all_samples[valid_indexes]
+        #     del all_samples
+        # self.samples = self.samples_dict[group]
+        self.indexes = train_indexes if group == "train" else valid_indexes
 
-        if use_uniprot_embedding:
-            # uniprot_indexes = []
-            with h5py.File(use_uniprot_embedding, "r") as file:
-                for idx, sample in enumerate(self.samples):
-                    assert len(sample['info']['sequences']) > 0
-                    for seq in sample['info']['sequences']:
-                        prot_id = seq.split('|')[1]
-                        if prot_id in file:
-                            sample['prot_id'] = prot_id
-                            sample['embed'] = np.array(file[prot_id])
-                                # uniprot_indexes.append(idx)
+        self.use_uniprot_embedding = use_uniprot_embedding
         assert include_densenet_embedding in ["all", "flt", False]
-        if include_densenet_embedding and group not in self.densenet_embeds_dict:
+        if include_densenet_embedding and not self.all_densenet_avg_list:
             all_densenet_avg_list = self.compute_avg_densenet_embeds(train_indexes, valid_indexes, include_densenet_embedding)
             assert len(all_densenet_avg_list) == TOTAL_LENGTH
-            all_densenet_avg_list = np.array(all_densenet_avg_list)
-            self.densenet_embeds_dict["train"] = all_densenet_avg_list[train_indexes]
-            self.densenet_embeds_dict["validation"] = all_densenet_avg_list[valid_indexes]
-            del all_densenet_avg_list
-        densenet_embeds = self.densenet_embeds_dict[group]
-        assert len(densenet_embeds) == len(self.samples)
-        for idx, densenet_avg in enumerate(densenet_embeds):
-            self.samples[idx]['densent_avg'] = densenet_avg
+            HPACombineDatasetMetadataInMemory.all_densenet_avg_list = TorchSerializedList(all_densenet_avg_list)
             
             # self.samples = [self.samples[idx] for idx in multi_avg_embeddings]
             # if 'embed' in self.samples[0]:
@@ -254,9 +234,9 @@ class HPACombineDatasetMetadataInMemory():
 
         self.include_densenet_embedding = include_densenet_embedding
         self.channels = None if channels is None else np.array(channels)
-        self.samples = TorchSerializedList(self.samples)
+        # self.samples = TorchSerializedList(self.samples)
         self.indexes = TorchSerializedList(self.indexes)
-        assert "info" in self.samples[0]
+        # assert "info" in self.samples[0]
 
         self.include_location = include_location
         self.return_info = return_info
@@ -267,7 +247,7 @@ class HPACombineDatasetMetadataInMemory():
                 albumentations.HorizontalFlip(p=0.5)])
         print(f"Dataset group: {group}, length: {len(self.indexes)}, image channels: {channels or [0, 1, 2]}")
 
-    def filter_and_split(self, train_split_ratio, split_by_indexes, seed, filter_func, cache_size):
+    def filter_and_split(self, train_split_ratio, split_by_indexes, seed, filter_func):
         # Construct / Load train and validation indices
         if split_by_indexes is None:
             assert train_split_ratio < 1 and train_split_ratio > 0
@@ -290,8 +270,8 @@ class HPACombineDatasetMetadataInMemory():
                 idcs = json.load(in_file)
             train_indexes = idcs["train"]
             valid_indexes = idcs["validation"]
-        train_indexes = list(filter(lambda i: i < cache_size, train_indexes))
-        valid_indexes = list(filter(lambda i: i < cache_size, valid_indexes))
+        # train_indexes = list(filter(lambda i: i < cache_size, train_indexes))
+        # valid_indexes = list(filter(lambda i: i < cache_size, valid_indexes))
         
         # if filter_func and split_by_indexes is None:
         if filter_func == 'has_location':
@@ -310,7 +290,7 @@ class HPACombineDatasetMetadataInMemory():
 
         # Group images of the same protein
         gid_to_nonvalid_imgids = {}
-        for index, info in tqdm(enumerate(self.info_list), total=TOTAL_LENGTH):
+        for index, info in tqdm(enumerate(self.info_list), total=TOTAL_LENGTH, desc="Grouping images of the same protein"):
             if index not in valid_indexes and (include_densenet_embedding == "all" or index in train_indexes):
                 gid = info['ensembl_ids']
                 if not isinstance(gid, str):
@@ -349,10 +329,12 @@ class HPACombineDatasetMetadataInMemory():
         return len(self.indexes)
 
     def __getitem__(self, i):
-        sample = self.samples[self.indexes[i]].copy()
+        hpa_index = self.indexes[i]
+        sample = dd.io.load(self.cache_file, f'/data_0/data_{hpa_index}').copy()
+        sample = {"image": sample["'image'"]["data_0"], "ref-image": sample["'ref-image'"]["data_0"]}
         if self.channels is not None:
             sample['image'] = sample['image'][:, :, self.channels]
-        info = sample["info"]
+        info = self.info_list[hpa_index]
         sample["condition_caption"] = f"{info['gene_names']}/{info['atlas_name']}"
         sample["location_caption"] = f"{info['locations']}"
         if self.include_location:
@@ -367,8 +349,21 @@ class HPACombineDatasetMetadataInMemory():
             # restore the range from [0, 1] to [-1, 1]
             sample["image"] = transformed["image"]*2 -1
             sample["ref-image"] = transformed["mask"]*2 -1
-        if not self.return_info:
-            del sample["info"] # Remove info to avoid issue in the dataloader
+        if self.return_info:
+            sample["info"] = info
+
+        if self.use_uniprot_embedding:
+            # uniprot_indexes = []
+            with h5py.File(self.use_uniprot_embedding, "r") as file:
+                assert len(info['sequences']) > 0
+                for seq in info['sequences']:
+                    prot_id = seq.split('|')[1]
+                    if prot_id in file:
+                        sample['prot_id'] = prot_id
+                        sample['embed'] = np.array(file[prot_id])
+                                # uniprot_indexes.append(idx)
+        if self.include_densenet_embedding:
+            sample["densent_avg"] = self.all_densenet_avg_list[hpa_index]
         return sample
 
 

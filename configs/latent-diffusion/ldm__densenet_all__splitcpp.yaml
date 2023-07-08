@@ -1,8 +1,7 @@
 model:
-  base_learning_rate: 1.0e-6   # set to target_lr by starting main.py with '--scale_lr True'
+  base_learning_rate: 2.0e-6   # set to target_lr by starting main.py with '--scale_lr True'; doesn't need to change this when using different numbers of GPUs
   target: ldm.models.diffusion.ddpm.LatentDiffusion
   params:
-    # ckpt_path: logs/2023-05-23T01-01-22_hpa-ldm-vq-4-hybrid-protein-densenet/checkpoints/last.ckpt
     ckpt_path: null
     linear_start: 0.0015
     linear_end: 0.0155
@@ -107,8 +106,8 @@ model:
 data:
   target: main.DataModuleFromConfig
   params:
-    batch_size: 8
-    num_workers: 8
+    batch_size: 8 # We can use a maximum batch size of 8 on a single GPU; doesn't need to change this when using different numbers of GPUs
+    num_workers: 2 # Number of dataloader subprocesses per GPU process (if using DDP); set it to 1 or 2 in this case
     wrap: False
     # train:
     #   target: ldm.data.hpa.HPACombineDatasetMetadata
@@ -129,7 +128,7 @@ data:
         group: 'train'
         train_split_ratio: null
         include_densenet_embedding: all
-        cache_file: /data/wei/hpa-webdataset-all-composite/HPACombineDatasetMetadataInMemory-256-t5.pickle
+        cache_file: /data/xikunz/hpa-webdataset-all-composite/HPACombineDatasetMetadataInMemory-256-t5.h5
         channels: [1, 1, 1]
         filter_func: has_location
         rotate_and_flip: true
@@ -142,7 +141,7 @@ data:
         group: 'validation'
         train_split_ratio: null
         include_densenet_embedding: all
-        cache_file: /data/wei/hpa-webdataset-all-composite/HPACombineDatasetMetadataInMemory-256-t5.pickle
+        cache_file: /data/xikunz/hpa-webdataset-all-composite/HPACombineDatasetMetadataInMemory-256-t5.h5
         channels: [1, 1, 1]
         filter_func: has_location
         include_location: true
@@ -158,7 +157,7 @@ lightning:
         monitor_val_metric: "val/loss_simple_ema"
         max_images: 8
         increase_log_steps: false
-        log_to_slack: ["combined"]
+        log_to_slack: []
         log_images_kwargs:
           ddim_steps: 100
           quantize_denoised: false
@@ -175,5 +174,4 @@ lightning:
   trainer:
     val_check_interval: 1.0
     benchmark: True
-    accelerator: dp # need to change to dp because the default ddp will free the training
-    # profiler: simple
+    # accelerator: dp # need to change to dp because the default ddp will free the training

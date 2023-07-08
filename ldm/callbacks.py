@@ -127,11 +127,7 @@ class ImageLogger(Callback):
 
     def log_img(self, pl_module, batch, batch_idx, split="train"):
         assert split in ['train', 'val']
-        check_idx = batch_idx if self.log_on_batch_idx else pl_module.global_step
-        if (self.log_validation and split == "val") or (self.check_frequency(check_idx) and  # batch_idx % self.batch_freq == 0
-                hasattr(pl_module, "log_images") and
-                callable(pl_module.log_images) and
-                self.max_images > 0):
+        if hasattr(pl_module, "log_images") and callable(pl_module.log_images) and self.max_images > 0:
             logger = type(pl_module.logger)
 
             is_train = pl_module.training
@@ -171,13 +167,15 @@ class ImageLogger(Callback):
 
     def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx):
         print(f"In on_train_batch_end, batch_idx {batch_idx}")
-        if not self.disabled and (pl_module.global_step > 0 or self.log_first_step):
+        check_idx = batch_idx if self.log_on_batch_idx else pl_module.global_step
+        if not self.disabled and (pl_module.global_step > 0 or self.log_first_step) and self.check_frequency(check_idx):
+            print(f"Logging training images in batch {batch_idx} at step {pl_module.global_step}")
             self.log_img(pl_module, batch, batch_idx, split="train")
 
     def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx):
         print(f"In on_validation_batch_end, batch_idx {batch_idx}")
         if self.log_validation and batch_idx % self.val_batch_frequency == 0 and not self.disabled and pl_module.global_step > 0:
-            print(f"Logging images for batch_idx {batch_idx}")
+            print(f"Logging validation images in batch {batch_idx}")
             self.log_img(pl_module, batch, batch_idx, split="val")
         if hasattr(pl_module, 'calibrate_grad_norm'):
             if (pl_module.calibrate_grad_norm and batch_idx % 25 == 0) and batch_idx > 0:
@@ -204,15 +202,15 @@ class CUDACallback(Callback):
 
     def on_train_epoch_end(self, trainer, pl_module, outputs):
         torch.cuda.synchronize(trainer.root_gpu)
-        max_memory = torch.cuda.max_memory_allocated(trainer.root_gpu) / 2 ** 20
+        max_memory = torch.cuda.max_memory_allocated(trainer.root_gpu) / 2 ** 30
         epoch_time = time.time() - self.start_time
 
         try:
             max_memory = trainer.training_type_plugin.reduce(max_memory)
             epoch_time = trainer.training_type_plugin.reduce(epoch_time)
 
-            rank_zero_info(f"Average Epoch time: {epoch_time:.2f} seconds")
-            rank_zero_info(f"Average Peak memory {max_memory:.2f}MiB")
+            rank_zero_info(f"Epoch time: {epoch_time:.2f} seconds")
+            rank_zero_info(f"Epoch peak GPU memory {max_memory:.2f}GB")
         except AttributeError:
             pass
 
