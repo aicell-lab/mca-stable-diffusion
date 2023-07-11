@@ -12,10 +12,9 @@ from pytorch_lightning import seed_everything
 from pytorch_lightning.trainer import Trainer
 
 from ldm.data.base import Txt2ImgIterableBaseDataset
-from ldm.parse import get_parser, nondefault_trainer_args
+from ldm.parse import get_parser, separate_args
 from ldm.util import instantiate_from_config, send_message_to_slack
 from memory_profiler import profile
-import wandb
 
 
 class WrappedDataset(Dataset):
@@ -140,8 +139,12 @@ def main(opt, logdir, nowname):
     trainer_config = lightning_config.get("trainer", OmegaConf.create())
     # default to ddp
     trainer_config["accelerator"] = trainer_config.get("accelerator", "ddp")
-    for k in nondefault_trainer_args(opt):
+    nondefault_trainer_args, non_trainer_args = separate_args(opt)
+    for k in nondefault_trainer_args:
         trainer_config[k] = getattr(opt, k)
+    config_to_log = dict()
+    for k in nondefault_trainer_args + non_trainer_args:
+        config_to_log[k] = getattr(opt, k)
     if not "gpus" in trainer_config:
         del trainer_config["accelerator"]
         cpu = True
@@ -173,6 +176,8 @@ def main(opt, logdir, nowname):
                 "offline": opt.debug,
                 "id": nowname,
                 "project": "super-multiplex-cell",
+                "config": config_to_log,
+                "resume": "allow",
             }
         },
         "testtube": {
@@ -468,7 +473,7 @@ if __name__ == "__main__":
         nowname = now + name + opt.postfix
         logdir = os.path.join(opt.logdir, "debug_logs" if opt.debug else "logs", nowname)
         os.makedirs(logdir)
-    wandb.init(project="super-multiplex-cell", config=opt, resume="allow", settings=wandb.Settings(start_method="fork"), name=nowname, mode="offline" if opt.debug else "online", id=nowname)
+    # wandb.init(project="super-multiplex-cell", config=opt, resume="allow", settings=wandb.Settings(start_method="fork"), name=nowname, mode="offline" if opt.debug else "online", id=nowname)
     if opt.debug:
         main(opt, logdir, nowname)
     else:

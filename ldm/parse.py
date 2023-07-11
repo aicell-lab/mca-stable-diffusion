@@ -105,10 +105,18 @@ def get_parser(**parser_kwargs):
     return parser
 
 
-def nondefault_trainer_args(opt):
+def separate_args(opt):
     parser = argparse.ArgumentParser()
     parser = Trainer.add_argparse_args(parser)
     args = parser.parse_args([])
-    return sorted(k for k in vars(args) if getattr(opt, k) != getattr(args, k))
+    nondefault_trainer_args, non_trainer_args = [], []
+    assert set(vars(args).keys()).issubset(set(vars(opt).keys()))
+    for k in sorted(vars(opt)):
+        if hasattr(args, k):
+            if getattr(opt, k) != getattr(args, k):
+                nondefault_trainer_args.append(k)
+        else:
+            non_trainer_args.append(k)
+    return nondefault_trainer_args, non_trainer_args
 
 

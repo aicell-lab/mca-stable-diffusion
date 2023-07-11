@@ -20,6 +20,7 @@ model:
     # scale_by_std: true
     scale_factor: 0.18215
     monitor: 'val/loss_simple_ema'
+    use_ema: false
 
     # scheduler_config: # 10000 warmup steps
     #   target: ldm.lr_scheduler.LambdaLinearScheduler
@@ -107,7 +108,7 @@ data:
   target: main.DataModuleFromConfig
   params:
     batch_size: 8 # We can use a maximum batch size of 8 on a single GPU; doesn't need to change this when using different numbers of GPUs
-    num_workers: 2 # Number of dataloader subprocesses per GPU process (if using DDP); set it to 1 or 2 in this case
+    num_workers: 1 # Number of dataloader subprocesses per GPU process (if using DDP); set it to 1 or 2 in this case
     wrap: False
     # train:
     #   target: ldm.data.hpa.HPACombineDatasetMetadata
@@ -158,6 +159,7 @@ lightning:
         max_images: 8
         increase_log_steps: false
         log_to_slack: []
+        log_first_step: true
         log_images_kwargs:
           ddim_steps: 100
           quantize_denoised: false
