@@ -1,6 +1,9 @@
-# We manage all the idiosyncracies of the original dataset's structure here
+"""We manage all the idiosyncracies of the original dataset's structure here"""
+
+import itertools
 import os
 import numpy as np
+np.bool = bool
 from collections import namedtuple
 import mahotas as mt
 import pandas as pd
@@ -8,6 +11,7 @@ import hashlib
 from PIL import Image
 from torchvision.utils import make_grid
 import torch
+import torch.nn as nn
 import hpacellseg.cellsegmentator as cellsegmentor
 from hpacellseg.utils import label_cell, label_nuclei
 from collections.abc import Iterable
@@ -34,10 +38,17 @@ def get_intensity_var(sample):
     return np.var(sample['image'])
 
 def normalized_to_uint8(image):
+    """Normalize an image to [0, 255]"""
     image -= np.min(image)
     image /= np.max(image)
     image *= 255
     return image.astype(np.uint8)
+
+# def normalized_to_0_1(image):
+#     """Normalize an image to [0, 1]"""
+#     image -= np.min(image)
+#     image /= np.max(image)
+#     return image
 
 def get_image_haralick(sample):
     # angular second moment, contrast, correlation, sum of squares: variance, 
@@ -67,19 +78,21 @@ def get_image_hash(sample):
     return image_hash
 
 def get_protein(sample):
-    return sample['caption'].split('/')[0]
+    return sample['condition_caption'].split('/')[0]
 
 def get_cell_line(sample):
-    return sample['caption'].split('/')[1]
+    return sample['condition_caption'].split('/')[1]
 
 def get_location(sample):
-    return sample['caption'].split('/')[2].split(',')
+    return sample['location_caption'].split(',')
 
 def get_segmented_cells(samples):
     # torch.nn.Module.dump_patches = True
     segmentor = cellsegmentor.CellSegmentator(
+        nuclei_model="/data/xikunz/stable-diffusion/nuclei_model.pth",
+        cell_model="/data/xikunz/stable-diffusion/cell_model.pth",
         # recommended 0.25; our samples are already downsized by 0.125
-        scale_factor=2,
+        scale_factor=1,
         # NOTE: setting padding=True seems to solve most issues that have been encountered
         #       during our single cell Kaggle challenge.
         device="cpu",
@@ -87,10 +100,17 @@ def get_segmented_cells(samples):
         multi_channel_model=True
     )
 
+    # To fix a pytorch 1.11.0 compatibility issue using the solution from https://github.com/ultralytics/yolov5/issues/6948#issuecomment-1299936326
+    for m in itertools.chain(segmentor.nuclei_model.modules(), segmentor.cell_model.modules()):
+        if isinstance(m, nn.Upsample):
+            m.recompute_scale_factor = None
     bulk_imgs = [normalized_to_uint8(get_ref_channel_image(sample)) for sample in samples]
+    # dapi_images = [i[:, :, 2] for i in bulk_imgs]
     nuc_segmentations = segmentor.pred_nuclei(bulk_imgs)
+    # nuc_segmentations = segmentor.pred_nuclei(dapi_images)
     cell_segmentations = segmentor.pred_cells(bulk_imgs, precombined=True)
     masks = [label_cell(nuc, cell) for nuc, cell in zip(nuc_segmentations, cell_segmentations)]
+    # nuc_masks = [label_nuclei(nuc) for nuc in nuc_segmentations]
 
     nuc_masks, cell_masks = [], []
     for i in range(len(masks)):
@@ -111,7 +131,10 @@ def get_percent_dark(sample):
 
 
 def get_nuc_cyto(sample):
+    ref_img = sample["ref-image"]
+    assert ref_img.min() == -1 and ref_img.max() == 1
     cell_masks, nuclei_masks = get_segmented_cells([sample])
+    print(f"{len(cell_masks[0])} cells and {len(nuclei_masks[0])} nuclei segmented for image {sample['hpa_index']}!")
     cell_masks = np.stack(cell_masks[0])[:, :, :, 0]
     nuclei_masks = np.stack(nuclei_masks[0])[:, :, :, 0]
     cyto_masks = cell_masks - nuclei_masks
@@ -144,9 +167,18 @@ nuc_cyto = Feature("Nuclei & Cytoplasm Expression", get_nuc_cyto, False, False, 
 # TODO: needs a command to refresh cache, for example if feature code was wrong
 # Just maintains a picked pandas dataframe so loading speed/size might become a bottle neck
 # If it really gets too big, we would need to use a database and expose it as a service maybe
-def get_features(samples, features, cache, logdir, debug_count=4, dataset_name="", recompute=[]): #, debugging=[image_sampler, segmentation_sampler]):
+def get_features(samples, features, cache, logdir, dataset_name="", recompute=[]): #, debugging=[image_sampler, segmentation_sampler]):
     if not cache:
-        return [{f.name: f.get_feature(sample) for f in features} for sample in samples]
+        feature_values = []
+        for sample in samples:
+            sample_feature_values = dict()
+            ref_img = sample["ref-image"]
+            assert ref_img.min() == -1 and ref_img.max() == 1
+            for f in features:
+                sample_feature_values[f.name] = f.get_feature(sample)
+            feature_values.append(sample_feature_values)
+        return feature_values
+        # return [{f.name: f.get_feature(sample) for f in features} for sample in samples]
 
     if logdir is None:
         raise ValueError("logdir must be specified if cache is True")
@@ -168,10 +200,12 @@ def get_features(samples, features, cache, logdir, debug_count=4, dataset_name="
         sample_features.append(feature_values)
         changed |= sample_changed
 
-    images = [torch.from_numpy(get_image(sample)) for sample in samples[:debug_count]]
+    # images = [torch.from_numpy(get_image(sample)) for sample in samples[:debug_count]]
+    images = [torch.from_numpy(get_image(sample)) for sample in samples]
     plot_image_sample(images, dataset_name, logdir, force_rgb=True)
 
-    cell_masks, nuc_masks = get_segmented_cells(samples[:debug_count])
+    # cell_masks, nuc_masks = get_segmented_cells(samples[:debug_count])
+    cell_masks, nuc_masks = get_segmented_cells(samples)
     plot_segmented_cells(cell_masks, nuc_masks, images, dataset_name, logdir)
 
     if changed:

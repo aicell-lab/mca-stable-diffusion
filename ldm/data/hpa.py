@@ -331,7 +331,9 @@ class HPACombineDatasetMetadataInMemory():
     def __getitem__(self, i):
         hpa_index = self.indexes[i]
         sample = dd.io.load(self.cache_file, f'/data_0/data_{hpa_index}').copy()
-        sample = {"image": sample["'image'"]["data_0"], "ref-image": sample["'ref-image'"]["data_0"]}
+        sample = {"image": sample["'image'"]["data_0"], "ref-image": sample["'ref-image'"]["data_0"], "hpa_index": hpa_index}
+        assert sample["ref-image"].min() == -1 and sample["ref-image"].max() == 1
+        assert sample["image"].min() == -1 and sample["image"].max() == 1
         if self.channels is not None:
             sample['image'] = sample['image'][:, :, self.channels]
         info = self.info_list[hpa_index]

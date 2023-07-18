@@ -81,11 +81,11 @@ def allocate_logdir(config, opt):
 # if there is a list of column names, need to iterate through the extracted values and add them
 # TODO: need to be able to get the dataset without the config? Intent with that was so you can just pass in the config
 # you're using for experiments. Not sure how useful that really is.
-def HPAToPandas(config, features, expand=None, cache=False, logdir=None, recompute=[]):
+def HPAToPandas(config, features, debug, expand=None, cache=False, logdir=None, recompute=[]):
     if expand is not None and expand not in ["common", "total"]:
         raise ValueError("expand must be either 'common' or 'total'")
 
-    data_explorer = DatasetExplorer(config)
+    data_explorer = DatasetExplorer(config, debug)
 
     datasets = {}
     column_names = [feature.name for feature in features]
@@ -189,7 +189,7 @@ def printTab(*args):
 
 
 class DatasetExplorer:
-    def __init__(self, config):
+    def __init__(self, config, debug):
         # Retrieve dataset from config
         # NOTE according to https://pytorch-lightning.readthedocs.io/en/latest/datamodules.html
         # calling these ourselves should not be necessary but it is.
@@ -197,9 +197,10 @@ class DatasetExplorer:
         self.data = instantiate_from_config(config.data)
         self.data.prepare_data()
         self.data.setup()
+        self.debug = debug
 
     def __iter__(self):
-        return DatasetIterator(self.data.datasets)
+        return DatasetIterator(self.data.datasets, self.debug)
 
     # returns list[dataset_names] to index into profiles
     def dataset_names(self):
@@ -253,11 +254,18 @@ class DatasetExplorer:
         # return np.sum(kl_div(ps, qs))
 
 
+def iterable_dataset(map_style_dataset, debug):
+    for i in range(len(map_style_dataset)):
+        if not debug or i < 4:
+            yield map_style_dataset[i]
+
+
 class DatasetIterator:
-    def __init__(self, datasets):
+    def __init__(self, datasets, debug):
         self.datasets = datasets
         self.i, self.keys = 0, list(datasets.keys())
         self.offset = 0
+        self.debug = debug
 
     # iterator that goes through each dataset in data
     # the samples list is a list of samples in the dataset
@@ -269,12 +277,13 @@ class DatasetIterator:
         dataset_name = self.keys[self.i]
         dataset = self.datasets[dataset_name]
 
-        n = len(dataset)
-        assert len(dataset.samples) >= self.offset + n
-        samples = dataset.samples[self.offset:self.offset + n]
+        # n = len(dataset)
+        # assert len(dataset.samples) >= self.offset + n
+        # samples = dataset.samples[self.offset:self.offset + n]
+        samples = iterable_dataset(dataset, self.debug)
 
-        self.i += 1
-        self.offset += n
+        # self.i += 1
+        # self.offset += n
 
         return dataset_name, samples
 

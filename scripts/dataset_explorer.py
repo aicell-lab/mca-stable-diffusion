@@ -22,13 +22,22 @@ from ldm.evaluation.dataset_utils import HPAToPandas, get_counts, get_common_fea
 from ldm.evaluation.dataset_vis import plot_profile, plot_haralick_umap, plot_conditional_dist
 
 """
-checkpoint:
-logs
-2023-01-17T01-02-06_hpa-ldm-vq-4-hybrid-protein-ishan
-checkpoints
-epochs=000073.ckpt
+info_list[0]:
+{'filename': '/archive/1680/1680_F4_5_', 'if_plate_id': 1680, 'position': 'F4', 'sample': 5, 'status': 35, 'Image status name': 'Annotated / Proteinatlas', 'locations': 'Cell Junctions', 'staining ch
+aracteristics': nan, 'unspecific': 0.0, 'antibody': 'HPA077995', 'ensembl_ids': 'ENSG00000253537', 'gene_names': 'PCDHGA7', 'atlas_name': 'SH-SY5Y', 'versions': '16.0,16.1,17.0', 'earliest_version': 
+16.0, 'first_released': '2016-12-04 14:00:00', 'latest_version': 17.0, 'Spatial cell cycle': nan, 'Intensity cell cycle': nan, 'Annotated cell cycle': 0.0, 'gain': 800.0, 'Ab state': 'IF_FAILED', 'Ma
+x tpm': 19.76, 'Finished in genes': nan, 'Protocol': 'PFA', 'Gene reliability (in release)': nan, 'Gene reliability (lims)': nan, 'Cell count': 24.0, 'well_location_predictions_all': nan, 'image_id':
+ '77995_1680_F4_5', 'sequences': ['>sp|Q9Y5G6|PCDG7_HUMAN Protocadherin gamma-A7 OS=Homo sapiens OX=9606 GN=PCDHGA7 PE=2 SV=1\nMAAQPRGGDYRGFFLLSILLGTPWEAWAGRILYSVSEETDKGSFVGDIAKDLGLEPRELA\nERGVRIISRG
+RTQLFALNQRSGSLVTAGRIDREEICAQSARCLVNFNILMEDKMNLYPID\nVEIIDINDNVPRFLTEEINVKIMENTAPGVRFPLSEAGDPDVGTNSLQSYQLSPNRHFSL\nAVQSGDDETKYPELVLERVLDREEERVHHLVLTASDGGDPPRSSTAHIQVTVVDVNDHTP\nVFSLPQYQVTVPENVPVGTRLLT
+VHAIDLDEGVNGEVTYSFRKITPKLPKMFHLNSLTGE\nISTLEGLDYEETAFYEMEVQAQDGPGSLTKAKVLITVLDVNDNAPEVTMTSLSSSIPEDT\nPLGTVIALFYLQDRDSGKNGEVTCTIPENLPFKLEKSIDNYYRLVTTKNLDRETLSLYNI\nTLKATDGGTPPLSRETHIFMQVADTNDNPPTFPHSS
+YSVYIAENNPRGASIFLVTAQDHD\nSEDNAQITYSLAEDTIQGAPVSSYVSINSDTGVLYALQSFDYEQLRELQLRVTAHDSGDP\nPLSSNMSLSLFVLDQNDNPPEILYPALPTDGSTGMELAPRSAEPGYLVTKVVAVDKDSGQ\nNAWLSYLLLKASEPGLFAVGLYTGEVRTARALLDRDALKQSLVVAVQDH
+GQPPLSATVTL\nTVAVADSIPEVLADLGSLEPSDGPYNYDLTLYLVVAVATVSCVFLAFVLVLLALRLRRWH\nKSRLLQASEGGLANVPTSHFVGMDGVQAFLQTYSHEVSLTADSRKSHLIFPQPNYVDMLI\nSQESCEKNDSLLTSVDFQECKENLPSIQQAPPNTDWRFSQAQRPGTSGSQNGDDTGTWPN\n
+NQFDTEMLQAMILASASEAADGSSTLGGGAGTMGLSARYGPQFTLQHVPDYRQNVYIPGS\nNATLTNAAGKRDGKAPAGGNGNKKKSGKKEKK\n']}
 """
 # model_checkpoint = os.path.join("logs", "2023-01-17T01-02-06_hpa-ldm-vq-4-hybrid-protein-ishan", "checkpoints", "epochs=000073.ckpt")
+
+# cache = True
+cache = False
 
 config, opt = load_config()
 logdir = allocate_logdir(config, opt)
@@ -39,7 +48,7 @@ if not opt.debug:
     sys.stdout = open(log_file, "w")
 
 features = [img_hash, protein, cell_line, location, int_mean, int_var, img_haralick, nuc_cyto]
-datasets = HPAToPandas(config, features, expand="total", cache=True, logdir=logdir)
+datasets = HPAToPandas(config, features, opt.debug, expand="total", cache=cache, logdir=logdir)
 counts = get_counts(datasets, features)
 
 for dataset_counts, dataset_name in zip(counts, datasets.keys()):
