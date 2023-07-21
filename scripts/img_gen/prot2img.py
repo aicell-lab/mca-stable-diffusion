@@ -1,4 +1,5 @@
 import argparse, os, datetime
+from collections import defaultdict
 import random
 import colorsys
 import pickle
@@ -98,7 +99,7 @@ def main(opt):
     data_config = config['data']
     data_config['params'][split]["params"]["return_info"] = True
 
-    # data
+    # Load data
     data = instantiate_from_config(data_config)
     # NOTE according to https://pytorch-lightning.readthedocs.io/en/latest/datamodules.html
     # calling these ourselves should not be necessary but it is.
@@ -113,7 +114,7 @@ def main(opt):
     # 'image': array(...)
     # 'file_path_': 'data/celeba/data256x256/21508.jpg'
     
-
+    # Load the model checkpoint
     model = instantiate_from_config(config.model)
     model.load_state_dict(torch.load(opt.checkpoint)["state_dict"],
                           strict=False)
@@ -121,6 +122,16 @@ def main(opt):
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     model = model.to(device)
     sampler = DDIMSampler(model)
+
+    # Create a mapping from protein to all its possible locations
+    if opt.fix_reference:
+        with open("/data/wei/hpa-webdataset-all-composite/HPACombineDatasetInfo.pickle", 'rb') as fp:
+            info_list = pickle.load(fp)
+        protcl2locs = defaultdict(set)
+        for x in info_list:
+            prot, cl = x["gene_names"], x["atlas_name"]
+            if str(prot) != "nan":
+                protcl2locs[(prot, cl)].update(str(x["locations"]).split(","))
 
     ref = None
     os.makedirs(opt.outdir, exist_ok=True)
@@ -169,7 +180,7 @@ def main(opt):
                 if not opt.fix_reference:
                     prot_image = prot_image.cpu().numpy()[0]*255
                     prot_image = prot_image.astype(np.uint8)
-                    Image.fromarray(prot_image.astype(np.uint8)).save(outpath+sample['info']['locations']+'_protein.png')
+                    Image.fromarray(prot_image.astype(np.uint8)).save(outpath+'protein.png')
                 
                 ref_image = ref_image.cpu().numpy()[0]*255
                 ref_image = ref_image.astype(np.uint8)
@@ -185,11 +196,22 @@ def main(opt):
                 ax = axes[1]
                 ax.imshow(predicted_image.astype(np.uint8))
                 ax.set_title("Predicted protein channel")
-                fig.suptitle(f"{name}, {sample['condition_caption']}, {sample['info']['locations']}")
-                fig.savefig(outpath+sample['info']['locations'])
+
+                prot, cl = sample['condition_caption'].split("/")
+                # locs_str = ",".join(protcl2locs[(prot, cl)]) if opt.fix_reference else sample['info']['locations']
+                if opt.fix_reference:
+                    locs_str = ""
+                    for i, loc in enumerate(protcl2locs[(prot, cl)]):
+                        locs_str += f"{loc},"
+                        if i % 2 == 1:
+                            locs_str += "\n"
+                else:
+                    locs_str = sample['info']['locations']
+                fig.suptitle(f"{name}, {sample['condition_caption']}, {locs_str}")
+                fig.savefig(outpath)
 
                 predicted_images.append(predicted_image)
-                locations.append(sample['info']['locations'])
+                locations.append(locs_str)
 
                 if opt.debug and i >= debug_count - 1:
                     break
