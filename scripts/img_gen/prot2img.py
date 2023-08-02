@@ -19,7 +19,7 @@ matplotlib.use('agg')
 import matplotlib.pyplot as plt
 
 """
-Command example: python scripts/prot2img.py --config=configs/latent-diffusion/hpa-ldm-vq-4-hybrid-protein-location-augmentation.yaml --checkpoint=logs/2023-04-07T01-25-41_hpa-ldm-vq-4-hybrid-protein-location-augmentation/checkpoints/last.ckpt --scale=2 --outdir=./data/22-fixed --fix-reference
+Command example: CUDA_VISIBLE_DEVICES=0 python scripts/prot2img.py --config=configs/latent-diffusion/hpa-ldm-vq-4-hybrid-protein-location-augmentation.yaml --checkpoint=logs/2023-04-07T01-25-41_hpa-ldm-vq-4-hybrid-protein-location-augmentation/checkpoints/last.ckpt --scale=2 --outdir=./data/22-fixed --fix-reference
 
 """
 
@@ -62,31 +62,31 @@ Command example: python scripts/prot2img.py --config=configs/latent-diffusion/hp
 # """
 
 
-def make_batch(image, mask, device):
-    image = np.array(Image.open(image).convert("RGB"))
-    image = image.astype(np.float32)/255.0
-    image = image[None].transpose(0,3,1,2)
-    image = torch.from_numpy(image)
+# def make_batch(image, mask, device):
+#     image = np.array(Image.open(image).convert("RGB"))
+#     image = image.astype(np.float32)/255.0
+#     image = image[None].transpose(0,3,1,2)
+#     image = torch.from_numpy(image)
 
-    mask = np.array(Image.open(mask).convert("L"))
-    mask = mask.astype(np.float32)/255.0
-    mask = mask[None,None]
-    mask[mask < 0.5] = 0
-    mask[mask >= 0.5] = 1
-    mask = torch.from_numpy(mask)
+#     mask = np.array(Image.open(mask).convert("L"))
+#     mask = mask.astype(np.float32)/255.0
+#     mask = mask[None,None]
+#     mask[mask < 0.5] = 0
+#     mask[mask >= 0.5] = 1
+#     mask = torch.from_numpy(mask)
 
-    masked_image = (1-mask)*image
+#     masked_image = (1-mask)*image
 
-    batch = {"image": image, "mask": mask, "masked_image": masked_image}
-    for k in batch:
-        batch[k] = batch[k].to(device=device)
-        batch[k] = batch[k]*2.0-1.0
-    return batch
+#     batch = {"image": image, "mask": mask, "masked_image": masked_image}
+#     for k in batch:
+#         batch[k] = batch[k].to(device=device)
+#         batch[k] = batch[k]*2.0-1.0
+#     return batch
 
 
 def main(opt):
     # now = datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
-    split = "train"
+    split = "validation"
     if opt.name:
         name = opt.name
     else:
@@ -116,7 +116,7 @@ def main(opt):
     
     # Load the model checkpoint
     model = instantiate_from_config(config.model)
-    model.load_state_dict(torch.load(opt.checkpoint)["state_dict"],
+    model.load_state_dict(torch.load(opt.checkpoint, map_location="cpu")["state_dict"],
                           strict=False)
 
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -136,9 +136,9 @@ def main(opt):
     ref = None
     os.makedirs(opt.outdir, exist_ok=True)
     total_count = len(data.datasets[split])
-    debug_count = 14
-    predicted_images = []
-    locations = []
+    debug_count = 14 if opt.fix_reference else 8
+    ref_images, predicted_images, gt_images = [], [], []
+    locations, filenames, conditions = [], [], []
     with torch.no_grad():
         with model.ema_scope():
             for i, sample in tqdm(enumerate(data.datasets[split]), total=total_count):
@@ -177,11 +177,6 @@ def main(opt):
                 predicted_image = torch.clamp((x_samples_ddim+1.0)/2.0,
                                               min=0.0, max=1.0)
 
-                if not opt.fix_reference:
-                    prot_image = prot_image.cpu().numpy()[0]*255
-                    prot_image = prot_image.astype(np.uint8)
-                    Image.fromarray(prot_image.astype(np.uint8)).save(outpath+'protein.png')
-                
                 ref_image = ref_image.cpu().numpy()[0]*255
                 ref_image = ref_image.astype(np.uint8)
                 # Image.fromarray(ref_image.astype(np.uint8)).save(outpath+sample['info']['locations']+'_reference.png')
@@ -189,29 +184,43 @@ def main(opt):
                 predicted_image = predicted_image.cpu().numpy().transpose(0,2,3,1)[0]*255
                 predicted_image = predicted_image.astype(np.uint8)
                 # Image.fromarray(predicted_image.astype(np.uint8)).save(outpath+sample['info']['locations']+'_prediction.png')
-                fig, axes = plt.subplots(1, 2)
+                fig, axes = plt.subplots(1, 2 if opt.fix_reference else 3)
                 ax = axes[0]
+                ax.axis('off')
                 ax.imshow(ref_image.astype(np.uint8))
-                ax.set_title("Reference channels")
+                ax.set_title("Reference")
                 ax = axes[1]
+                ax.axis('off')
                 ax.imshow(predicted_image.astype(np.uint8))
-                ax.set_title("Predicted protein channel")
+                ax.set_title("Predicted protein")
+                if not opt.fix_reference:
+                    prot_image = prot_image.cpu().numpy()[0]*255
+                    prot_image = prot_image.astype(np.uint8)
+                    # Image.fromarray(prot_image.astype(np.uint8)).save(outpath+'protein.png')
+                    ax = axes[2]
+                    ax.axis('off')
+                    ax.imshow(prot_image.astype(np.uint8))
+                    ax.set_title("GT protein")
 
                 prot, cl = sample['condition_caption'].split("/")
                 # locs_str = ",".join(protcl2locs[(prot, cl)]) if opt.fix_reference else sample['info']['locations']
                 if opt.fix_reference:
                     locs_str = ""
-                    for i, loc in enumerate(protcl2locs[(prot, cl)]):
-                        locs_str += f"{loc},"
-                        if i % 2 == 1:
+                    for j, loc in enumerate(protcl2locs[(prot, cl)]):
+                        if j > 0 and j % 2 == 0:
                             locs_str += "\n"
+                        locs_str += f"{loc},"
                 else:
                     locs_str = sample['info']['locations']
                 fig.suptitle(f"{name}, {sample['condition_caption']}, {locs_str}")
                 fig.savefig(outpath)
 
+                ref_images.append(ref_image)
                 predicted_images.append(predicted_image)
+                gt_images.append(prot_image)
                 locations.append(locs_str)
+                filenames.append(name)
+                conditions.append(sample['condition_caption'])
 
                 if opt.debug and i >= debug_count - 1:
                     break
@@ -221,24 +230,51 @@ def main(opt):
     # set color map to gray
     plt.set_cmap('gray')
 
-    fig, axes = plt.subplots(3, 5, figsize=(20,12))
-    axes = axes.flatten()
-    for i in range(len(predicted_images) + 1):
-        # plt.subplot(3,5,i+1)
-        ax = axes[i]
-        # Use mean instead of sum, which was the previous practice
-        image = ref_image if i == 0 else predicted_images[i - 1].mean(axis=2)
-        print(f"max: {image.max()}, min:{image.min()}")
-        # clip the image to 0-1
-        image = np.clip(image, 0, 255) / 255.0
-        ax.imshow(image)
-        ax.axis('off')
-        # plot text in each image with locations
-        # plt.text(0, 20, locations[i], color='white', fontsize=10)
-        ax.set_title("Reference" if i == 0 else locations[i - 1])
+    if opt.fix_reference:
+        fig, axes = plt.subplots(3, 5, figsize=(20,12))
+        axes = axes.flatten()
+        n_images_to_plot = min(15, len(predicted_images) + 1)
+        for i in range(n_images_to_plot):
+            # plt.subplot(3,5,i+1)
+            ax = axes[i]
+            # Use mean instead of sum, which was the previous practice
+            image = ref_image if i == 0 else predicted_images[i - 1].mean(axis=2)
+            print(f"max: {image.max()}, min:{image.min()}")
+            # clip the image to 0-1
+            image = np.clip(image, 0, 255) / 255.0
+            ax.imshow(image)
+            ax.axis('off')
+            # plot text in each image with locations
+            # plt.text(0, 20, locations[i], color='white', fontsize=10)
+            ax.set_title("Reference" if i == 0 else locations[i - 1])
+    else:
+        fig, axes = plt.subplots(8, 3, figsize=(12,20))
+        n_images_to_plot = min(8, len(predicted_images))
+        for i in range(n_images_to_plot):
+            for j in range(3):
+                ax = axes[i, j]
+                # Use mean instead of sum, which was the previous practice
+                if j == 0:
+                    image = ref_images[i]
+                    title = f"{filenames[i]},{conditions[i]}"
+                elif j == 1:
+                    image = predicted_images[i].mean(axis=2)
+                    title = "predicted"
+                else:
+                    image = gt_images[i].mean(axis=2)
+                    title = locations[i]
+                print(f"max: {image.max()}, min:{image.min()}")
+                # clip the image to 0-1
+                image = np.clip(image, 0, 255) / 255.0
+                ax.imshow(image)
+                ax.axis('off')
+                # plot text in each image with locations
+                # plt.text(0, 20, locations[i], color='white', fontsize=10)
+                ax.set_title(title)
         
-    plt.suptitle(f'{split} reference, guidance scale = {opt.scale}')
-    plt.savefig(os.path.join(opt.outdir, f'predicted-image-grid-s{opt.scale}.png'))
+    fig.suptitle(f'{split} reference, guidance scale = {opt.scale}')
+    fig.savefig(os.path.join(opt.outdir, f'predicted-image-grid-s{opt.scale}.png'))
+    fig.tight_layout()
 
     if opt.fix_reference:
         # Save images in a pickle file
