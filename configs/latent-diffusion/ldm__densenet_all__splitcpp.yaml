@@ -165,10 +165,10 @@ lightning:
           quantize_denoised: false
           inpaint: false
           unconditional_guidance_scale: 2.0
-          plot_denoise_rows: true
+          plot_denoise_rows: false
           plot_progressive_rows: false
           plot_diffusion_rows: false
-          plot_inputs: false
+          plot_inputs: false # "Inputs" here actually mean the target images
           plot_reconstructions: false
           mix_sample: true
           n_row: 8

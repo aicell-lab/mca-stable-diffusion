@@ -52,17 +52,16 @@ def allocate_logdir(config, opt):
     # else:
     #     name = ""
 
-    now = datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
+    # now = datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
     # nowname = now + name + opt.postfix
     # logdir = os.path.join(opt.logdir, nowname)
     # setup logger to send output to file
     if opt.debug:
-        logdir = os.path.join(opt.logdir, "dataset_explorer_dev")
-        os.makedirs(logdir, exist_ok=True)
+        logdir = os.path.join(opt.logdir, "eval_debug_logs")
     else:
-        now = datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
-        logdir = os.path.join(opt.logdir, f"dataset_{config.data['name']}_{now}")
-        os.mkdir(logdir)
+        # now = datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
+        logdir = os.path.join(opt.logdir, f"eval_logs")
+    os.makedirs(logdir, exist_ok=True)
 
     # if opt.dev:
     #     for root, dirs, files in os.walk(logdir):
@@ -89,8 +88,10 @@ def HPAToPandas(config, features, debug, expand=None, cache=False, logdir=None, 
 
     datasets = {}
     column_names = [feature.name for feature in features]
-    for dataset_name, samples in data_explorer:
-        data_features = get_features(samples, features, cache=cache, logdir=logdir, dataset_name=dataset_name, recompute=recompute)
+    for dataset_name, samples, dataset_size in data_explorer:
+        print(f"Getting features for {dataset_name}")
+        data_features = get_features(samples, features, dataset_size, cache=cache, logdir=logdir, dataset_name=dataset_name, recompute=recompute)
+        print(f"Done getting features for {dataset_name}")
         datasets[dataset_name] = pd.DataFrame.from_dict(data_features, orient="columns")
 
     # TODO factor out the expansion logic to a separate function
@@ -161,7 +162,7 @@ def get_counts(datasets, features):
         for feature in features:
             dataset_counts[feature.name] = Counter(instances(data[feature.name], expandLists=True))
             printTab(f"Top 5 {feature}s: {dataset_counts[feature.name].most_common(5)}")
-            counts.append(dataset_counts)
+        counts.append(dataset_counts)
         print(dataset_counts)
     return counts
 
@@ -277,15 +278,15 @@ class DatasetIterator:
         dataset_name = self.keys[self.i]
         dataset = self.datasets[dataset_name]
 
-        # n = len(dataset)
+        n = len(dataset)
         # assert len(dataset.samples) >= self.offset + n
         # samples = dataset.samples[self.offset:self.offset + n]
         samples = iterable_dataset(dataset, self.debug)
 
-        # self.i += 1
+        self.i += 1
         # self.offset += n
 
-        return dataset_name, samples
+        return dataset_name, samples, n
 
 # class FeatureCountProfile:
 #     # features at a label for that statistic and a function that takes

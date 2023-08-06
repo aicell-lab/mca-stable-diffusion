@@ -12,6 +12,7 @@ from PIL import Image
 from torchvision.utils import make_grid
 import torch
 import torch.nn as nn
+from tqdm import tqdm
 import hpacellseg.cellsegmentator as cellsegmentor
 from hpacellseg.utils import label_cell, label_nuclei
 from collections.abc import Iterable
@@ -167,13 +168,13 @@ nuc_cyto = Feature("Nuclei & Cytoplasm Expression", get_nuc_cyto, False, False, 
 # TODO: needs a command to refresh cache, for example if feature code was wrong
 # Just maintains a picked pandas dataframe so loading speed/size might become a bottle neck
 # If it really gets too big, we would need to use a database and expose it as a service maybe
-def get_features(samples, features, cache, logdir, dataset_name="", recompute=[]): #, debugging=[image_sampler, segmentation_sampler]):
+def get_features(samples, features, dataset_size, cache, logdir, dataset_name="", recompute=()): #, debugging=[image_sampler, segmentation_sampler]):
     if not cache:
         feature_values = []
-        for sample in samples:
+        for sample in tqdm(samples, desc="Calculating feature values", total=dataset_size):
             sample_feature_values = dict()
             ref_img = sample["ref-image"]
-            assert ref_img.min() == -1 and ref_img.max() == 1
+            assert ref_img.min() == -1 and ref_img.max() <= 1
             for f in features:
                 sample_feature_values[f.name] = f.get_feature(sample)
             feature_values.append(sample_feature_values)
@@ -217,7 +218,7 @@ def get_features(samples, features, cache, logdir, dataset_name="", recompute=[]
 
 # TODO: can store digest of the feature code in the cache to detect changes and automatically recompute
 # then we can just get rid of this recompute parameter
-def retrieve_from_cache(sample, features, df, recompute=[]):
+def retrieve_from_cache(sample, features, df, recompute=()):
     feature_values = {}
     key = img_hash.get_feature(sample)
     changed = False

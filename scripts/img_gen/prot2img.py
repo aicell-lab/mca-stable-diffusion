@@ -13,6 +13,7 @@ from main import instantiate_from_config
 from ldm.models.diffusion.ddim import DDIMSampler
 from ldm.parse import str2bool
 from ldm.util import instantiate_from_config
+from ldm.evaluation.metrics import calc_metrics
 # import yaml
 import matplotlib 
 matplotlib.use('agg')
@@ -139,6 +140,7 @@ def main(opt):
     debug_count = 14 if opt.fix_reference else 8
     ref_images, predicted_images, gt_images = [], [], []
     locations, filenames, conditions = [], [], []
+    mse_list, ssim_list = [], []
     with torch.no_grad():
         with model.ema_scope():
             for i, sample in tqdm(enumerate(data.datasets[split]), total=total_count):
@@ -169,6 +171,10 @@ def main(opt):
                                                  unconditional_conditioning=uc,
                                                  verbose=False)
                 x_samples_ddim = model.decode_first_stage(samples_ddim)
+
+                mse, ssim = calc_metrics(x_samples_ddim, torch.permute(sample['image'], (0, 3, 1, 2)))
+                mse_list.append(mse)
+                ssim_list.append(ssim)
 
                 prot_image = torch.clamp((sample['image']+1.0)/2.0,
                                     min=0.0, max=1.0)
@@ -248,7 +254,7 @@ def main(opt):
             # plt.text(0, 20, locations[i], color='white', fontsize=10)
             ax.set_title("Reference" if i == 0 else locations[i - 1])
     else:
-        fig, axes = plt.subplots(8, 3, figsize=(12,20))
+        fig, axes = plt.subplots(8, 3, figsize=(10,15))
         n_images_to_plot = min(8, len(predicted_images))
         for i in range(n_images_to_plot):
             for j in range(3):
@@ -259,10 +265,10 @@ def main(opt):
                     title = f"{filenames[i]},{conditions[i]}"
                 elif j == 1:
                     image = predicted_images[i].mean(axis=2)
-                    title = "predicted"
+                    title = f"Predicted, MSE: {mse_list[i]:.2g}, SSIM: {ssim_list[i]:.2g}"
                 else:
                     image = gt_images[i].mean(axis=2)
-                    title = locations[i]
+                    title = f"GT, {locations[i]}"
                 print(f"max: {image.max()}, min:{image.min()}")
                 # clip the image to 0-1
                 image = np.clip(image, 0, 255) / 255.0
@@ -271,8 +277,9 @@ def main(opt):
                 # plot text in each image with locations
                 # plt.text(0, 20, locations[i], color='white', fontsize=10)
                 ax.set_title(title)
-        
-    fig.suptitle(f'{split} reference, guidance scale = {opt.scale}')
+    mse_mean = np.mean(mse_list)
+    ssim_mean = np.mean(ssim_list) 
+    fig.suptitle(f'{split} reference, guidance scale = {opt.scale}, MSE: {mse_mean:.2g}, SSIM: {ssim_mean:.2g}')
     fig.savefig(os.path.join(opt.outdir, f'predicted-image-grid-s{opt.scale}.png'))
     fig.tight_layout()
 

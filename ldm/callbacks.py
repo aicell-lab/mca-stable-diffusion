@@ -13,7 +13,9 @@ import psutil
 from pytorch_lightning.callbacks import Callback
 from pytorch_lightning.utilities.distributed import rank_zero_only
 from pytorch_lightning.utilities import rank_zero_info
+import wandb
 
+from ldm.evaluation.metrics import calc_metrics
 from ldm.util import send_message_to_slack, send_image_to_slack
 
 
@@ -78,6 +80,7 @@ class ImageLogger(Callback):
         self.max_images = max_images
         self.logger_log_images = {
             pl.loggers.TestTubeLogger: self._testtube,
+            pl.loggers.WandbLogger: self._wandb,
         }
         self.log_steps = [2 ** n for n in range(int(np.log2(self.batch_freq)) + 1)]
         if not increase_log_steps:
@@ -92,7 +95,7 @@ class ImageLogger(Callback):
         self.monitor_val_metric = monitor_val_metric
 
     @rank_zero_only
-    def _testtube(self, pl_module, images, batch_idx, split):
+    def _testtube(self, pl_module, images, samples, targets, batch_idx, split):
         for k in images:
             grid = torchvision.utils.make_grid(images[k])
             grid = (grid + 1.0) / 2.0  # -1,1 -> 0,1; c,h,w
@@ -101,6 +104,20 @@ class ImageLogger(Callback):
             pl_module.logger.experiment.add_image(
                 tag, grid,
                 global_step=pl_module.global_step)
+
+    @rank_zero_only
+    def _wandb(self, pl_module, images, samples, targets, batch_idx, split):
+        for k in images:
+            grid = (images[k] + 1.0) / 2.0  # -1,1 -> 0,1; c,h,w
+            image = wandb.Image(grid)
+
+            tag = f"{split}/batch{batch_idx}_{k}"
+            wandb.log({tag: image}, step=pl_module.global_step)
+
+        mse, ssim = calc_metrics(samples, targets)
+        # pl_module.log(f"{split}/mse", mse) # Don't set `on_step` or `on_epoch` since this is already inside `on_train_batch_end()` or `on_validation_batch_end`
+        # pl_module.log(f"{split}/ssim", ssim)
+        wandb.log({f"{split}/mse": mse, f"{split}/ssim": ssim}, step=pl_module.global_step)
 
     @rank_zero_only
     def log_local(self, save_dir, split, images,
@@ -127,7 +144,7 @@ class ImageLogger(Callback):
 
     def log_img(self, pl_module, batch, batch_idx, split="train"):
         assert split in ['train', 'val']
-        if hasattr(pl_module, "log_images") and callable(pl_module.log_images) and self.max_images > 0:
+        if hasattr(pl_module, "gen_images") and callable(pl_module.gen_images) and self.max_images > 0:
             logger = type(pl_module.logger)
 
             is_train = pl_module.training
@@ -135,7 +152,7 @@ class ImageLogger(Callback):
                 pl_module.eval()
 
             with torch.no_grad():
-                images = pl_module.log_images(batch, split=split, **self.log_images_kwargs)
+                images, targets, samples = pl_module.gen_images(batch, split=split, **self.log_images_kwargs)
 
             for k in images:
                 N = min(images[k].shape[0], self.max_images)
@@ -149,7 +166,7 @@ class ImageLogger(Callback):
                            pl_module.global_step, pl_module.current_epoch, batch_idx)
 
             logger_log_images = self.logger_log_images.get(logger, lambda *args, **kwargs: None)
-            logger_log_images(pl_module, images, pl_module.global_step, split)
+            logger_log_images(pl_module, images, samples, targets, batch_idx, split)
 
             if is_train:
                 pl_module.train()

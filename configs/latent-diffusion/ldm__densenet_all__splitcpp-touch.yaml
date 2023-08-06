@@ -165,15 +165,18 @@ lightning:
           quantize_denoised: false
           inpaint: false
           unconditional_guidance_scale: 2.0
-          plot_denoise_rows: true
+          plot_denoise_rows: false
           plot_progressive_rows: false
           plot_diffusion_rows: false
           plot_inputs: false
           plot_reconstructions: false
-          mix_sample: true
+          mix_sample: false
           n_row: 8
 
   trainer:
-    val_check_interval: 10
+    val_check_interval: 1.0
     benchmark: True
     # accelerator: dp # need to change to dp because the default ddp will free the training
+    limit_train_batches: 2
+    limit_val_batches: 2
+    max_epochs: 3

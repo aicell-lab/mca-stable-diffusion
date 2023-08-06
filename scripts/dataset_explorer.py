@@ -14,6 +14,8 @@ import os
 import sys
 import numpy as np
 import prettyprinter as pp
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 from ldm.evaluation.dataset_features import protein, cell_line, location, img_hash, int_mean, int_var, img_haralick, nuc_cyto
@@ -41,13 +43,15 @@ cache = False
 
 config, opt = load_config()
 logdir = allocate_logdir(config, opt)
+print(f"Log directory: {logdir}")
 
 if not opt.debug:
     log_file = os.path.join(logdir, f"dataset_explorer.log")
     print(f"Saving logs to {log_file}")
     sys.stdout = open(log_file, "w")
 
-features = [img_hash, protein, cell_line, location, int_mean, int_var, img_haralick, nuc_cyto]
+# features = [img_hash, protein, cell_line, location, int_mean, int_var, img_haralick, nuc_cyto]
+features = [img_hash, protein, cell_line, location, int_mean, int_var, img_haralick]
 datasets = HPAToPandas(config, features, opt.debug, expand="total", cache=cache, logdir=logdir)
 counts = get_counts(datasets, features)
 
@@ -70,7 +74,7 @@ for dataset_name, dataset in datasets.items():
         logdir, sample_size=10)
     
 # Get prior to smooth distribution and reduce chance of accidental infs
-plot_conditional_dist(nuc_cyto, cell_line, datasets, 'train', 'validation', logdir, summary='histogram', dims=1, bins=5)
+# plot_conditional_dist(nuc_cyto, cell_line, datasets, 'train', 'validation', logdir, summary='histogram', dims=1, bins=5)
 
 # get binned histogram of intensities using a beta distribution centered at -0.5 with number of samples=bins
 # TODO: ending up just needing a uniform prior over the distribution, otherwise the KL stuff becomes ill-defined...
