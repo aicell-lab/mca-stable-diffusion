@@ -91,7 +91,7 @@ def main(opt):
     if opt.name:
         name = opt.name
     else:
-        name = f"{split}__gd{opt.scale}__fr_{opt.fix_reference}"
+        name = f"{split}__gd{opt.scale}__fr_{opt.fix_reference}__steps{opt.steps}"
     # nowname = now + "_" + name
     opt.outdir = f"{os.path.dirname(os.path.dirname(opt.checkpoint))}/{name}"
 
@@ -137,6 +137,7 @@ def main(opt):
     ref = None
     os.makedirs(opt.outdir, exist_ok=True)
     total_count = len(data.datasets[split])
+    count = 0
     debug_count = 14 if opt.fix_reference else 8
     ref_images, predicted_images, gt_images = [], [], []
     locations, filenames, conditions = [], [], []
@@ -144,6 +145,8 @@ def main(opt):
     with torch.no_grad():
         with model.ema_scope():
             for i, sample in tqdm(enumerate(data.datasets[split]), total=total_count):
+                if i % 3 != 0:
+                    continue
             # for image, mask in tqdm(zip(images, masks)):
                 # print(d['info']['Ab state'], d['info']['locations'], d['location_classes'])
                 sample = {k: torch.from_numpy(np.expand_dims(sample[k], axis=0)).to(device) if isinstance(sample[k], (np.ndarray, np.generic)) else sample[k] for k in sample.keys()}
@@ -228,8 +231,9 @@ def main(opt):
                 filenames.append(name)
                 conditions.append(sample['condition_caption'])
 
-                if opt.debug and i >= debug_count - 1:
+                if opt.debug and count >= debug_count - 1:
                     break
+                count += 1
 
     # plot the first 15 images in a grid
     # plt.figure(figsize=(20,12))
@@ -279,7 +283,7 @@ def main(opt):
                 ax.set_title(title)
     mse_mean = np.mean(mse_list)
     ssim_mean = np.mean(ssim_list) 
-    fig.suptitle(f'{split} reference, guidance scale = {opt.scale}, MSE: {mse_mean:.2g}, SSIM: {ssim_mean:.2g}')
+    fig.suptitle(f'{split} reference, guidance scale={opt.scale}, DDIM steps={opt.steps}, MSE: {mse_mean:.2g}, SSIM: {ssim_mean:.2g}')
     fig.savefig(os.path.join(opt.outdir, f'predicted-image-grid-s{opt.scale}.png'))
     fig.tight_layout()
 
