@@ -297,8 +297,7 @@ Diffusion model ith spatial transformer:
 ```
 ### Train the diffusion model (reference image + densenet condition)
 ```
-python main.py -t -b configs/latent-diffusion/ldm__densenet_all__splitcpp.yaml --gpus=
-0,1,2,3 --scale_lr=True -f __noema
+python main.py -t -b configs/latent-diffusion/ldm__densenet_all__splitcpp.yaml --gpus=0,1,2,3 --scale_lr=True -f __noema
 ```
 
 
