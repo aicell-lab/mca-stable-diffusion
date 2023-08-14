@@ -297,13 +297,13 @@ Diffusion model ith spatial transformer:
 ```
 ### Train the diffusion model (reference image + densenet condition)
 ```
-python main.py -t -b configs/latent-diffusion/hpa-ldm-vq-4-hybrid-protein-densenet.yaml --gpus=0,1,2,3 --scale_lr=False
+python main.py -t -b configs/latent-diffusion/ldm__densenet_all__splitcpp.yaml --gpus=0,1,2,3 --scale_lr=True -f __noema
 ```
 
 
 ### Perform inference / sampling
 ```
-python scripts/prot2img-densenet.py --config=configs/latent-diffusion/hpa-ldm-vq-4-hybrid-protein-densenet.yaml --checkpoint=logs/2023-05-23T16-11-15_hpa-ldm-vq-4-hybrid-protein-densenet/checkpoints/last.ckpt --scale=8 --outdir=./data/8-densenet-full --fix-reference 
+python scripts/prot2img-densenet.py --config=configs/latent-diffusion/hpa-ldm-vq-4-hybrid-protein-densenet.yaml --checkpoint=/data/wei/stable-diffusion/logs/2023-05-23T16-11-15_hpa-ldm-vq-4-hybrid-protein-densenet/checkpoints/last.ckpt --scale=8 --outdir=/data/xikunz/stable-diffusion/logs/2023-05-23T16-11-15_hpa-ldm-vq-4-hybrid-protein-densenet/guide8 --fix-reference 
 ```
 
 ### About protein embedding

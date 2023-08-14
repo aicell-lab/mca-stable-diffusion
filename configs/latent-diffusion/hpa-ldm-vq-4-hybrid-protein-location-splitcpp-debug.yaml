@@ -44,7 +44,7 @@ model:
         use_scale_shift_norm: True
         resblock_updown: True
         use_spatial_transformer: True
-        context_dim: 1024
+        context_dim: 33
 
     first_stage_config:
       target: ldm.models.autoencoder.VQModelInterface
@@ -73,9 +73,9 @@ model:
     cond_stage_config:
       target: ldm.data.hpa.HPAClassEmbedder
       params:
-        include_location: false
+        include_location: true
         include_ref_image: true
-        include_densenet_embedding: true
+        include_densenet_embedding: false
         include_cellline: false
         include_embed: false
         use_loc_embedding: false
@@ -126,26 +126,26 @@ data:
       params:
         seed: 123
         group: 'train'
-        train_split_ratio: 0.95
-        include_densenet_embedding: all
+        train_split_ratio: null
+        include_densenet_embedding: false
         cache_file: /data/wei/hpa-webdataset-all-composite/HPACombineDatasetMetadataInMemory-256-1000-t5.pickle
         channels: [1, 1, 1]
         filter_func: has_location
         rotate_and_flip: true
         include_location: true
-        split_by_indexes: null
+        split_by_indexes: /data/wei/hpa-webdataset-all-composite/stage1_data_split_flt4.json
     validation:
       target: ldm.data.hpa.HPACombineDatasetMetadataInMemory
       params:
         seed: 123
         group: 'validation'
-        train_split_ratio: 0.95
-        include_densenet_embedding: all
+        train_split_ratio: null
+        include_densenet_embedding: false
         cache_file: /data/wei/hpa-webdataset-all-composite/HPACombineDatasetMetadataInMemory-256-1000-t5.pickle
         channels: [1, 1, 1]
         filter_func: has_location
         include_location: true
-        split_by_indexes: null
+        split_by_indexes: /data/wei/hpa-webdataset-all-composite/stage1_data_split_flt4.json
 lightning:
   callbacks:
     image_logger:

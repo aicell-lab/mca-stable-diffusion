@@ -375,7 +375,7 @@ class DDPM(pl.LightningModule):
         return denoise_grid
 
     @torch.no_grad()
-    def log_images(self, batch, N=8, n_row=2, sample=True, return_keys=None, **kwargs):
+    def gen_images(self, batch, N=8, n_row=2, sample=True, return_keys=None, **kwargs):
         log = dict()
         x = self.get_input(batch, self.first_stage_key)
         N = min(x.shape[0], N)
@@ -1269,7 +1269,7 @@ class LatentDiffusion(DDPM):
 
     @torch.no_grad()
     def sample_log(self,cond,batch_size,ddim, ddim_steps,**kwargs):
-
+        # main.py(401)on_validation_batch_end() -> main.py(362)log_img() -> ddpm.py(1371)gen_images() -> ddpm.py(1273)sample_log()
         if ddim:
             ddim_sampler = DDIMSampler(self)
             shape = (self.channels, self.image_size, self.image_size)
@@ -1284,7 +1284,7 @@ class LatentDiffusion(DDPM):
 
 
     @torch.no_grad()
-    def log_images(self, batch, N=8, n_row=4, sample=True, ddim_steps=200, ddim_eta=1., return_keys=None, unconditional_guidance_scale=1.0,
+    def gen_images(self, batch, N=8, n_row=4, sample=True, ddim_steps=200, ddim_eta=1., return_keys=None, unconditional_guidance_scale=1.0,
                    quantize_denoised=True, inpaint=True, plot_denoise_rows=False, plot_progressive_rows=True,
                    plot_diffusion_rows=True, mix_sample=False, plot_inputs=False, plot_reconstructions=False, **kwargs):
 
@@ -1298,30 +1298,32 @@ class LatentDiffusion(DDPM):
                                            bs=N)
         N = min(x.shape[0], N)
         n_row = min(x.shape[0], n_row)
-        inputs_grid = make_grid(x, nrow=1)
+        targets_grid = make_grid(x, nrow=1)
 
+        # "Inputs" here actually mean the target images
         if plot_inputs:
-            log["inputs"] = inputs_grid
+            log["inputs"] = targets_grid
 
         if plot_reconstructions:
             log["reconstruction"] = make_grid(xrec, nrow=1)
 
+        conditions_grid = None
         if self.model.conditioning_key is not None:
             if hasattr(self.cond_stage_model, "decode"):
                 xc = self.cond_stage_model.decode(c)
                 if "condition_caption" in batch:
                     caption_image = (1 - make_grid(log_txt_as_img((x.shape[2], x.shape[3]), batch["condition_caption"][:N], size=12), nrow=1)).to(xc.get_device())
-                    log["conditioning"] = torch.clip(xc + caption_image, -1.0, 1.0)
+                    conditions_grid = torch.clip(xc + caption_image, -1.0, 1.0)
                 else:
-                    log["conditioning"] = xc
+                    conditions_grid = xc
             elif self.cond_stage_key in ["caption"]:
                 xc = log_txt_as_img((x.shape[2], x.shape[3]), batch["caption"])
-                log["conditioning"] = xc
+                conditions_grid = xc
             elif self.cond_stage_key == 'class_label':
-                xc = log_txt_as_img((x.shape[2], x.shape[3]), batch["human_label"])
-                log['conditioning'] = xc
+                xc = conditions_grid((x.shape[2], x.shape[3]), batch["human_label"])
+                conditions_grid = xc
             elif isimage(xc):
-                log["conditioning"] = xc
+                conditions_grid = xc
             if ismap(xc):
                 log["original_conditioning"] = self.to_rgb(xc)
 
@@ -1404,18 +1406,15 @@ class LatentDiffusion(DDPM):
                 samples_x0_quantized = make_grid(x_samples, nrow=1)
                 columns = [samples_x0_quantized, ] + columns
 
-            if "conditioning" in log:
-                columns = [log["conditioning"], ] + columns
-                del log["conditioning"]
+            if conditions_grid is not None:
+                columns = [conditions_grid, ] + columns
             
             if "location_caption" in batch:
                 # Create the reference input image with location labels
-                caption_image = (1 - make_grid(log_txt_as_img((x.shape[2], x.shape[3]), batch["location_caption"][:N], size=12), nrow=1)).to(inputs_grid.get_device())
-                ref_inputs = torch.clip(inputs_grid + caption_image, -1.0, 1.0)
-            else:
-                ref_inputs = inputs_grid
+                caption_image = (1 - make_grid(log_txt_as_img((x.shape[2], x.shape[3]), batch["location_caption"][:N], size=12), nrow=1)).to(targets_grid.get_device())
+                targets_grid = torch.clip(targets_grid + caption_image, -1.0, 1.0)
 
-            columns = [ref_inputs, ] + columns
+            columns = columns + [targets_grid, ]
             
             log["combined"] = torch.cat(columns, dim=2)
 
@@ -1454,7 +1453,7 @@ class LatentDiffusion(DDPM):
                 return log
             else:
                 return {key: log[key] for key in return_keys}
-        return log
+        return log, x, x_samples
 
     def configure_optimizers(self):
         lr = self.learning_rate
@@ -1527,8 +1526,8 @@ class Layout2ImgDiffusion(LatentDiffusion):
         assert cond_stage_key == 'coordinates_bbox', 'Layout2ImgDiffusion only for cond_stage_key="coordinates_bbox"'
         super().__init__(cond_stage_key=cond_stage_key, *args, **kwargs)
 
-    def log_images(self, batch, N=8, *args, **kwargs):
-        logs = super().log_images(batch=batch, N=N, *args, **kwargs)
+    def gen_images(self, batch, N=8, *args, **kwargs):
+        logs, _, _ = super().gen_images(batch=batch, N=N, *args, **kwargs)
 
         key = 'train' if self.training else 'validation'
         dset = self.trainer.datamodule.datasets[key]
