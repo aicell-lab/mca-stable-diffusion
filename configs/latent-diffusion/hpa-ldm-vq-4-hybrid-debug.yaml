@@ -37,10 +37,12 @@ model:
         model_channels: 192
         attention_resolutions: [ 1, 2, 4, 8 ]   # 32, 16, 8, 4
         num_res_blocks: 2
-        channel_mult: [ 1,2,2,4,4 ]  # 32, 16, 8, 4, 2
+        channel_mult: [ 1, 2, 2, 4, 4 ]  # 32, 16, 8, 4, 2
         num_heads: 8
         use_scale_shift_norm: True
         resblock_updown: True
+        use_spatial_transformer: True
+        context_dim: 38
 
     first_stage_config:
       target: ldm.models.autoencoder.VQModelInterface
@@ -96,7 +98,7 @@ model:
 data:
   target: main.DataModuleFromConfig
   params:
-    batch_size: 16
+    batch_size: 8
     num_workers: 4
     wrap: False
     # train:
