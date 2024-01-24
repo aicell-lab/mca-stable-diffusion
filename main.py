@@ -168,19 +168,19 @@ def main(opt, logdir, nowname):
 
     # default logger configs
     default_logger_cfgs = {
-        "wandb": {
-            "target": "pytorch_lightning.loggers.WandbLogger",
-            "params": {
-                "name": nowname,
-                "save_dir": logdir,
-                # "offline": opt.debug,
-                "offline": False,
-                "id": nowname,
-                "project": "super-multiplex-cell",
-                "config": config_to_log,
-                "resume": "allow",
-            }
-        },
+        # "wandb": {
+        #     "target": "pytorch_lightning.loggers.WandbLogger",
+        #     "params": {
+        #         "name": nowname,
+        #         "save_dir": logdir,
+        #         # "offline": opt.debug,
+        #         "offline": False,
+        #         "id": nowname,
+        #         "project": "super-multiplex-cell",
+        #         "config": config_to_log,
+        #         "resume": "allow",
+        #     }
+        #},
         "testtube": {
             "target": "pytorch_lightning.loggers.TestTubeLogger",
             "params": {
@@ -189,7 +189,7 @@ def main(opt, logdir, nowname):
             }
         },
     }
-    default_logger_cfg = default_logger_cfgs["wandb"]
+    default_logger_cfg = default_logger_cfgs["testtube"]
     if "logger" in lightning_config:
         logger_cfg = lightning_config.logger
     else:
