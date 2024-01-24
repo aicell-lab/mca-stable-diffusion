@@ -2,28 +2,28 @@ import webdataset as wds
 from torch.utils.data import Dataset
 import cv2
 import albumentations
+import PIL
+from functools import partial
 import numpy as np
+import torchvision.transforms.functional as TF
 from PIL import Image
-from tqdm import tqdm, trange
+from tqdm import tqdm
+from ldm.modules.image_degradation import degradation_fn_bsr, degradation_fn_bsr_light
 import os
 import random
 import torch
 import torch.nn as nn
+from functools import partial
 from einops import rearrange
 from ldm.util import instantiate_from_config
 from torchvision.utils import make_grid
 import json
 import h5py
-import deepdish as dd
-import warnings
-warnings.filterwarnings("ignore")
 
 try:
    import cPickle as pickle
 except:
    import pickle
-
-from ldm.data.serialize import TorchSerializedList
 
 HPA_DATA_ROOT = os.environ.get("HPA_DATA_ROOT", "/data/wei/hpa-webdataset-all-composite")
 
@@ -161,12 +161,9 @@ def dump_info(info_pickle_path):
     with open(info_pickle_path, 'wb') as fp:
         pickle.dump(info_list, fp)
 
-
 class HPACombineDatasetMetadataInMemory():
 
-    cache_file = None
-    # samples_dict = {}
-    all_densenet_avg_list = []
+    samples_dict = {}
     
     @staticmethod
     def generate_cache(cache_file, *args, total_length=None, **kwargs):
@@ -182,50 +179,67 @@ class HPACombineDatasetMetadataInMemory():
             pickle.dump(samples, fp)
 
     def __init__(self, cache_file, seed=123, train_split_ratio=0.95, group='train', channels=None, include_location=False, include_densenet_embedding=False, return_info=False, filter_func=None, dump_to_file=None, rotate_and_flip=False, split_by_indexes=None, use_uniprot_embedding=False):
-        with open(f"{HPA_DATA_ROOT}/HPACombineDatasetInfo.pickle", 'rb') as fp:
-            self.info_list = TorchSerializedList(pickle.load(fp))
-        assert len(self.info_list) == TOTAL_LENGTH
-
-        # Load cache
-        # if cache_file in HPACombineDatasetMetadataInMemory.samples_dict:
-        #     self.samples = HPACombineDatasetMetadataInMemory.samples_dict[cache_file]
-        # else:
-        assert group in ['train', 'validation']
-        if self.cache_file is None:
-            self.cache_file = cache_file
+        if cache_file in HPACombineDatasetMetadataInMemory.samples_dict:
+            self.samples = HPACombineDatasetMetadataInMemory.samples_dict[cache_file]
         else:
-            assert self.cache_file == cache_file
-        # if group not in self.samples_dict:
-            # if os.path.exists(cache_file):
-            #     print(f"Loading data from cache file {cache_file}, this may take a while...")
-            #     start_time = time.time()
-            #     with open(cache_file, 'rb') as fp:
-            #         all_samples = pickle.load(fp)
-            #     time_span = time.time() - start_time
-            #     print(f"Cache loading is finished. Took {int(time_span)} s in total.")
-            # else:
-            #     raise Exception(f"Cache file not found {cache_file}")
-            # HPACombineDatasetMetadataInMemory.samples_dict[cache_file] = self.samples
+            if os.path.exists(cache_file):
+                print(f"Loading data from cache file {cache_file}, this may take a while...")
+                with open(cache_file, 'rb') as fp:
+                    self.samples = pickle.load(fp)
+                
+                if include_densenet_embedding:
+                    assert split_by_indexes is None
+                    with open("/data/wei/hpa-webdataset-all-composite/HPACombineDatasetInfo-indexes-densenet-features-avg.json", "r") as f:
+                        multi_avg_embeddings = json.load(f)
+                    with open("/data/wei/hpa-webdataset-all-composite/HPACombineDatasetInfo-densenet-features-avg.pickle", "rb") as f:
+                        densent_features_avg = pickle.load(f)
 
-        train_indexes, valid_indexes = self.filter_and_split(train_split_ratio, split_by_indexes, seed, filter_func)
-        #     all_samples = np.array(all_samples)
-        #     self.samples_dict["train"] = all_samples[train_indexes]
-        #     self.samples_dict["validation"] = all_samples[valid_indexes]
-        #     del all_samples
-        # self.samples = self.samples_dict[group]
-        self.indexes = train_indexes if group == "train" else valid_indexes
+                    sample_count = len(self.samples)
+                    # debug cache file example: HPACombineDatasetMetadataInMemory-256-1000-t5.pickle
+                    if "-1000" not in cache_file:
+                        assert sample_count == len(densent_features_avg)
+                    # for debug, we have less samples in the samples
+                    if len(densent_features_avg)> sample_count:
+                        multi_avg_embeddings = [idx for idx in multi_avg_embeddings if idx < sample_count]
+                    
+                    for idx in multi_avg_embeddings:
+                        self.samples[idx]['densent_avg'] = densent_features_avg[idx]
+                    
+                    self.samples = [self.samples[idx] for idx in multi_avg_embeddings]
+                    if 'embed' in self.samples[0]:
+                        for sample in self.samples:
+                            del sample['embed']
 
-        self.use_uniprot_embedding = use_uniprot_embedding
-        assert include_densenet_embedding in ["all", "flt", False]
-        if include_densenet_embedding and not self.all_densenet_avg_list:
-            all_densenet_avg_list = self.compute_avg_densenet_embeds(train_indexes, valid_indexes, include_densenet_embedding)
-            assert len(all_densenet_avg_list) == TOTAL_LENGTH
-            HPACombineDatasetMetadataInMemory.all_densenet_avg_list = TorchSerializedList(all_densenet_avg_list)
-            
-            # self.samples = [self.samples[idx] for idx in multi_avg_embeddings]
-            # if 'embed' in self.samples[0]:
-            #     for sample in self.samples:
-            #         del sample['embed']
+                # Patch the generated pickle file to include info
+                # with open(f"{HPA_DATA_ROOT}/HPACombineDatasetInfo.pickle", 'rb') as fp:
+                #     info_list = pickle.load(fp)
+                # assert len(info_list) == len(self.samples)
+                # for i in tqdm(range(len(self.samples)), total=len(self.samples)):
+                #     self.samples[i]["info"] = info_list[i]
+                # with open(cache_file, 'wb') as fp:
+                #     pickle.dump(self.samples, fp)
+                # print("Data loaded")
+            else:
+                raise Exception(f"Cache file not found {cache_file}")
+            HPACombineDatasetMetadataInMemory.samples_dict[cache_file] = self.samples
+        
+        if filter_func and split_by_indexes is None:
+            if filter_func == 'has_location':
+                filter_func = lambda x: int( x['info']['status']) == 35 and x['info']['Ab state'] == 'IF_FINISHED' and str(x['info']['locations']) != "nan"
+
+            self.samples = list(filter(filter_func, self.samples))
+        
+        if use_uniprot_embedding:
+            uniprot_indexes = []
+            with h5py.File(use_uniprot_embedding, "r") as file:
+                for idx, sample in enumerate(self.samples):
+                    if len(sample['info']['sequences']) > 0:
+                        for seq in sample['info']['sequences']:
+                            prot_id = seq.split('|')[1]
+                            if prot_id in file:
+                                sample['prot_id'] = prot_id
+                                sample['embed'] = np.array(file[prot_id])
+                                uniprot_indexes.append(idx)
         
         if dump_to_file:
             assert dump_to_file != cache_file, "please do not overwrite the cache file"
@@ -233,10 +247,8 @@ class HPACombineDatasetMetadataInMemory():
                 pickle.dump(self.samples, fp)
 
         self.include_densenet_embedding = include_densenet_embedding
-        self.channels = None if channels is None else np.array(channels)
-        # self.samples = TorchSerializedList(self.samples)
-        self.indexes = TorchSerializedList(self.indexes)
-        # assert "info" in self.samples[0]
+        self.channels = channels
+        assert "info" in self.samples[0]
 
         self.include_location = include_location
         self.return_info = return_info
@@ -245,98 +257,38 @@ class HPACombineDatasetMetadataInMemory():
             self.preprocessor = albumentations.Compose(
                 [albumentations.Rotate(limit=180, border_mode=cv2.BORDER_REFLECT_101, p=1.0, interpolation=cv2.INTER_NEAREST),
                 albumentations.HorizontalFlip(p=0.5)])
-        print(f"Dataset group: {group}, length: {len(self.indexes)}, image channels: {channels or [0, 1, 2]}")
-
-    def filter_and_split(self, train_split_ratio, split_by_indexes, seed, filter_func):
-        # Construct / Load train and validation indices
+        self.length = len(self.samples)
+        assert group in ['train', 'validation']
         if split_by_indexes is None:
             assert train_split_ratio < 1 and train_split_ratio > 0
-            filter_func4 = lambda x: int( x['status']) == 35 and x['Ab state'] == 'IF_FINISHED' and str(x["gene_names"]) != "nan" and x["sequences"]
-            indexes = []
-            for i, x in enumerate(self.info_list):
-                if filter_func4(x):
-                    indexes.append(i)
             random.seed(seed)
-            # indexes = list(range(self.length))
+            indexes = list(range(self.length))
             random.shuffle(indexes)
-            size = int(train_split_ratio * len(indexes))
-            train_indexes = indexes[:size]
-            valid_indexes = indexes[size:]
-            # if use_uniprot_embedding:
-            #     self.indexes = list(filter(lambda i: i in uniprot_indexes, self.indexes))
+            size = int(train_split_ratio * self.length)
+            if group == 'train':
+                self.indexes = indexes[:size]
+            else:
+                self.indexes = indexes[size:]
+            if use_uniprot_embedding:
+                self.indexes = list(filter(lambda i: i in uniprot_indexes, self.indexes))
         else:
-            assert train_split_ratio is None, "train_split_ratio should be None when split_by_indexes is used"
+            assert train_split_ratio is None, "train_split_ratio should not be None when split_by_indexes is used"
             with open(split_by_indexes, "r") as in_file:
                 idcs = json.load(in_file)
-            train_indexes = idcs["train"]
-            valid_indexes = idcs["validation"]
-        # train_indexes = list(filter(lambda i: i < cache_size, train_indexes))
-        # valid_indexes = list(filter(lambda i: i < cache_size, valid_indexes))
-        
-        # if filter_func and split_by_indexes is None:
-        if filter_func == 'has_location':
-            filter_func = lambda i: str(self.info_list[i]['locations']) != "nan"
-
-            train_indexes = list(filter(filter_func, train_indexes))
-            valid_indexes = list(filter(filter_func, valid_indexes))
-        return train_indexes, valid_indexes
-    
-    def compute_avg_densenet_embeds(self, train_indexes, valid_indexes, include_densenet_embedding):
-        # Load all densenet embeddings
-        # if HPACombineDatasetMetadataInMemory.densenet_embeds is None:
-        with open("/data/wei/hpa-webdataset-all-composite/HPACombineDatasetInfo-densenet-features.pickle", "rb") as f:
-            densenet_embeds = pickle.load(f)
-        assert densenet_embeds.shape == (TOTAL_LENGTH, 1024)
-
-        # Group images of the same protein
-        gid_to_nonvalid_imgids = {}
-        for index, info in tqdm(enumerate(self.info_list), total=TOTAL_LENGTH, desc="Grouping images of the same protein"):
-            if index not in valid_indexes and (include_densenet_embedding == "all" or index in train_indexes):
-                gid = info['ensembl_ids']
-                if not isinstance(gid, str):
-                    continue
-                if gid not in gid_to_nonvalid_imgids:
-                    gid_to_nonvalid_imgids[gid] = [index]
-                else:
-                    gid_to_nonvalid_imgids[gid].append(index)
-
-        densent_features_avg = []
-        zero_emd_count = 0
-        for index in trange(TOTAL_LENGTH, desc="Calculating average densenet embeddings"):
-            gid = self.info_list[index]['ensembl_ids']
-            if not isinstance(gid, str):
-                # no ensembl id
-                densent_features_avg.append(np.zeros([1024], dtype='float32'))
-                zero_emd_count += 1
-                continue
-            # assert index in ensembl_ids[gid], f"{index} not in {ensembl_ids[gid]}"
-            ids = gid_to_nonvalid_imgids[gid].copy()
-            if index in ids:
-                ids.remove(index)
-            if len(ids) == 0:
-                densent_features_avg.append(np.zeros([1024], dtype='float32'))
-                zero_emd_count += 1
-            else:
-                # multi_avg_embeddings.append(index)
-                avg_emd = densenet_embeds[ids].mean(axis=0)
-                assert avg_emd.sum() != 0
-                densent_features_avg.append(avg_emd)
-        print(f"There are {zero_emd_count} images with a zero avg densenet embedding.")
-
-        return densent_features_avg
+            # assert len(self.samples) == len(idcs['train']) + len(idcs['validation'])
+            self.indexes = list(filter(lambda i: i < self.length, idcs[group]))
+            if use_uniprot_embedding:
+                self.indexes = list(filter(lambda i: i in uniprot_indexes, self.indexes))
+        print(f"Dataset group: {group}, length: {len(self.indexes)}, image channels: {self.channels or [0, 1, 2]}")
 
     def __len__(self):
         return len(self.indexes)
 
     def __getitem__(self, i):
-        hpa_index = self.indexes[i]
-        sample = dd.io.load(self.cache_file, f'/data_0/data_{hpa_index}').copy()
-        sample = {"image": sample["'image'"]["data_0"], "ref-image": sample["'ref-image'"]["data_0"], "hpa_index": hpa_index}
-        assert sample["ref-image"].min() == -1 and sample["ref-image"].max() <= 1
-        assert sample["image"].min() == -1 and sample["image"].max() <= 1
-        if self.channels is not None:
+        sample = self.samples[self.indexes[i]].copy()
+        if self.channels:
             sample['image'] = sample['image'][:, :, self.channels]
-        info = self.info_list[hpa_index]
+        info = sample["info"]
         sample["condition_caption"] = f"{info['gene_names']}/{info['atlas_name']}"
         sample["location_caption"] = f"{info['locations']}"
         if self.include_location:
@@ -351,141 +303,128 @@ class HPACombineDatasetMetadataInMemory():
             # restore the range from [0, 1] to [-1, 1]
             sample["image"] = transformed["image"]*2 -1
             sample["ref-image"] = transformed["mask"]*2 -1
-        if self.return_info:
-            sample["info"] = info
-
-        if self.use_uniprot_embedding:
-            # uniprot_indexes = []
-            with h5py.File(self.use_uniprot_embedding, "r") as file:
-                assert len(info['sequences']) > 0
-                for seq in info['sequences']:
-                    prot_id = seq.split('|')[1]
-                    if prot_id in file:
-                        sample['prot_id'] = prot_id
-                        sample['embed'] = np.array(file[prot_id])
-                                # uniprot_indexes.append(idx)
-        if self.include_densenet_embedding:
-            sample["densent_avg"] = self.all_densenet_avg_list[hpa_index]
+        if not self.return_info:
+            del sample["info"] # Remove info to avoid issue in the dataloader
         return sample
 
 
-# class HPACombineDatasetSR(Dataset):
-#     def __init__(self, filename, size=None, length=80000, channels=None,
-#                  degradation=None, downscale_f=4, min_crop_f=0.5, max_crop_f=1.,
-#                  random_crop=True, protein_embedding="bert"):
-#         """
-#         Imagenet Superresolution Dataloader
-#         Performs following ops in order:
-#         1.  crops a crop of size s from image either as random or center crop
-#         2.  resizes crop to size with cv2.area_interpolation
-#         3.  degrades resized crop with degradation_fn
+class HPACombineDatasetSR(Dataset):
+    def __init__(self, filename, size=None, length=80000, channels=None,
+                 degradation=None, downscale_f=4, min_crop_f=0.5, max_crop_f=1.,
+                 random_crop=True, protein_embedding="bert"):
+        """
+        Imagenet Superresolution Dataloader
+        Performs following ops in order:
+        1.  crops a crop of size s from image either as random or center crop
+        2.  resizes crop to size with cv2.area_interpolation
+        3.  degrades resized crop with degradation_fn
 
-#         :param size: resizing to size after cropping
-#         :param degradation: degradation_fn, e.g. cv_bicubic or bsrgan_light
-#         :param downscale_f: Low Resolution Downsample factor
-#         :param min_crop_f: determines crop size s,
-#           where s = c * min_img_side_len with c sampled from interval (min_crop_f, max_crop_f)
-#         :param max_crop_f: ""
-#         :param data_root:
-#         :param random_crop:
-#         """
-#         if channels is None:
-#             self.channels = [0, 1, 2]
-#         else:
-#             self.channels = channels
-#         self.base = HPACombineDataset(filename, include_metadata=False, length=length, protein_embedding=protein_embedding)
-#         assert size
-#         assert (size / downscale_f).is_integer()
-#         self.size = size
-#         self.LR_size = int(size / downscale_f)
-#         self.min_crop_f = min_crop_f
-#         self.max_crop_f = max_crop_f
-#         assert(max_crop_f <= 1.)
-#         self.center_crop = not random_crop
+        :param size: resizing to size after cropping
+        :param degradation: degradation_fn, e.g. cv_bicubic or bsrgan_light
+        :param downscale_f: Low Resolution Downsample factor
+        :param min_crop_f: determines crop size s,
+          where s = c * min_img_side_len with c sampled from interval (min_crop_f, max_crop_f)
+        :param max_crop_f: ""
+        :param data_root:
+        :param random_crop:
+        """
+        if channels is None:
+            self.channels = [0, 1, 2]
+        else:
+            self.channels = channels
+        self.base = HPACombineDataset(filename, include_metadata=False, length=length, protein_embedding=protein_embedding)
+        assert size
+        assert (size / downscale_f).is_integer()
+        self.size = size
+        self.LR_size = int(size / downscale_f)
+        self.min_crop_f = min_crop_f
+        self.max_crop_f = max_crop_f
+        assert(max_crop_f <= 1.)
+        self.center_crop = not random_crop
 
-#         self.image_rescaler = albumentations.SmallestMaxSize(max_size=size, interpolation=cv2.INTER_AREA)
+        self.image_rescaler = albumentations.SmallestMaxSize(max_size=size, interpolation=cv2.INTER_AREA)
 
-#         self.pil_interpolation = False # gets reset later if incase interp_op is from pillow
+        self.pil_interpolation = False # gets reset later if incase interp_op is from pillow
 
-#         if degradation == "bsrgan":
-#             self.degradation_process = partial(degradation_fn_bsr, sf=downscale_f)
+        if degradation == "bsrgan":
+            self.degradation_process = partial(degradation_fn_bsr, sf=downscale_f)
 
-#         elif degradation == "bsrgan_light":
-#             self.degradation_process = partial(degradation_fn_bsr_light, sf=downscale_f)
+        elif degradation == "bsrgan_light":
+            self.degradation_process = partial(degradation_fn_bsr_light, sf=downscale_f)
 
-#         else:
-#             interpolation_fn = {
-#             "cv_nearest": cv2.INTER_NEAREST,
-#             "cv_bilinear": cv2.INTER_LINEAR,
-#             "cv_bicubic": cv2.INTER_CUBIC,
-#             "cv_area": cv2.INTER_AREA,
-#             "cv_lanczos": cv2.INTER_LANCZOS4,
-#             "pil_nearest": PIL.Image.NEAREST,
-#             "pil_bilinear": PIL.Image.BILINEAR,
-#             "pil_bicubic": PIL.Image.BICUBIC,
-#             "pil_box": PIL.Image.BOX,
-#             "pil_hamming": PIL.Image.HAMMING,
-#             "pil_lanczos": PIL.Image.LANCZOS,
-#             }[degradation]
+        else:
+            interpolation_fn = {
+            "cv_nearest": cv2.INTER_NEAREST,
+            "cv_bilinear": cv2.INTER_LINEAR,
+            "cv_bicubic": cv2.INTER_CUBIC,
+            "cv_area": cv2.INTER_AREA,
+            "cv_lanczos": cv2.INTER_LANCZOS4,
+            "pil_nearest": PIL.Image.NEAREST,
+            "pil_bilinear": PIL.Image.BILINEAR,
+            "pil_bicubic": PIL.Image.BICUBIC,
+            "pil_box": PIL.Image.BOX,
+            "pil_hamming": PIL.Image.HAMMING,
+            "pil_lanczos": PIL.Image.LANCZOS,
+            }[degradation]
             
 
-#             self.pil_interpolation = degradation.startswith("pil_")
+            self.pil_interpolation = degradation.startswith("pil_")
 
-#             if self.pil_interpolation:
-#                 self.degradation_process = partial(TF.resize, size=self.LR_size, interpolation=TF.InterpolationMode.NEAREST)
+            if self.pil_interpolation:
+                self.degradation_process = partial(TF.resize, size=self.LR_size, interpolation=TF.InterpolationMode.NEAREST)
 
-#             else:
-#                 self.degradation_process = albumentations.SmallestMaxSize(max_size=self.LR_size,
-#                                                                           interpolation=interpolation_fn)
+            else:
+                self.degradation_process = albumentations.SmallestMaxSize(max_size=self.LR_size,
+                                                                          interpolation=interpolation_fn)
 
-#     def __len__(self):
-#         return len(self.base)
+    def __len__(self):
+        return len(self.base)
 
-#     def __getitem__(self, i):
-#         example = self.base[i]
-#         image = example["image"]
-#         image = image[:, :, self.channels]
+    def __getitem__(self, i):
+        example = self.base[i]
+        image = example["image"]
+        image = image[:, :, self.channels]
 
-#         min_side_len = min(image.shape[:2])
-#         crop_side_len = min_side_len * np.random.uniform(self.min_crop_f, self.max_crop_f, size=None)
-#         crop_side_len = int(crop_side_len)
+        min_side_len = min(image.shape[:2])
+        crop_side_len = min_side_len * np.random.uniform(self.min_crop_f, self.max_crop_f, size=None)
+        crop_side_len = int(crop_side_len)
 
-#         if self.center_crop:
-#             self.cropper = albumentations.CenterCrop(height=crop_side_len, width=crop_side_len)
+        if self.center_crop:
+            self.cropper = albumentations.CenterCrop(height=crop_side_len, width=crop_side_len)
 
-#         else:
-#             self.cropper = albumentations.RandomCrop(height=crop_side_len, width=crop_side_len)
+        else:
+            self.cropper = albumentations.RandomCrop(height=crop_side_len, width=crop_side_len)
 
-#         image = self.cropper(image=image)["image"]
-#         image = self.image_rescaler(image=image)["image"]
+        image = self.cropper(image=image)["image"]
+        image = self.image_rescaler(image=image)["image"]
 
-#         if self.pil_interpolation:
-#             image_pil = PIL.Image.fromarray(image)
-#             LR_image = self.degradation_process(image_pil)
-#             LR_image = np.array(LR_image).astype(np.uint8)
+        if self.pil_interpolation:
+            image_pil = PIL.Image.fromarray(image)
+            LR_image = self.degradation_process(image_pil)
+            LR_image = np.array(LR_image).astype(np.uint8)
 
-#         else:
-#             LR_image = self.degradation_process(image=image)["image"]
+        else:
+            LR_image = self.degradation_process(image=image)["image"]
 
-#         example["image"] = (image/127.5 - 1.0).astype(np.float32)
-#         example["LR_image"] = (LR_image/127.5 - 1.0).astype(np.float32)
+        example["image"] = (image/127.5 - 1.0).astype(np.float32)
+        example["LR_image"] = (LR_image/127.5 - 1.0).astype(np.float32)
 
-#         return example
+        return example
     
 
-# class ClassEmbedder(nn.Module):
-#     def __init__(self, embed_dim, n_classes=1000, key='class'):
-#         super().__init__()
-#         self.key = key
-#         self.embedding = nn.Embedding(n_classes, embed_dim)
+class ClassEmbedder(nn.Module):
+    def __init__(self, embed_dim, n_classes=1000, key='class'):
+        super().__init__()
+        self.key = key
+        self.embedding = nn.Embedding(n_classes, embed_dim)
 
-#     def forward(self, batch, key=None):
-#         if key is None:
-#             key = self.key
-#         # this is for use in crossattn
-#         c = batch[key][:, None]
-#         c = self.embedding(c)
-#         return c
+    def forward(self, batch, key=None):
+        if key is None:
+            key = self.key
+        # this is for use in crossattn
+        c = batch[key][:, None]
+        c = self.embedding(c)
+        return c
 
 class HPAClassEmbedder(nn.Module):
     def __init__(self, include_location=False, include_ref_image=False, include_cellline=True, include_embed=False, use_loc_embedding=True, image_embedding_model=None, include_densenet_embedding=False):
@@ -546,39 +485,40 @@ class HPAClassEmbedder(nn.Module):
         return condition_grid
 
 
-# class HPAHybridEmbedder(nn.Module):
-#     def __init__(self, image_embedding_model, include_location=False):
-#         super().__init__()
-#         assert not isinstance(image_embedding_model, dict)
-#         self.image_embedding_model = instantiate_from_config(image_embedding_model)
-#         self.include_location = include_location
+class HPAHybridEmbedder(nn.Module):
+    def __init__(self, image_embedding_model, include_location=False):
+        super().__init__()
+        assert not isinstance(image_embedding_model, dict)
+        self.image_embedding_model = instantiate_from_config(image_embedding_model)
+        self.include_location = include_location
 
-#     def forward(self, batch, key=None):
-#         image = batch["ref-image"]
-#         assert image.shape[3] == 3
-#         image = rearrange(image, 'b h w c -> b c h w').contiguous()
-#         with torch.no_grad():
-#             img_embed = self.image_embedding_model.encode(image)
-#         if torch.any(torch.isnan(img_embed)):
-#             raise Exception("NAN values encountered in the image embedding")
-#         embed = batch["embed"]
-#         celline = batch["cell-line"]
-#         cross_embed = [embed, celline]
-#         if self.include_location:
-#             cross_embed.append(batch["location_classes"])
-#         return {"c_concat": [img_embed], "c_crossattn": cross_embed}
+    def forward(self, batch, key=None):
+        image = batch["ref-image"]
+        assert image.shape[3] == 3
+        image = rearrange(image, 'b h w c -> b c h w').contiguous()
+        with torch.no_grad():
+            img_embed = self.image_embedding_model.encode(image)
+        if torch.any(torch.isnan(img_embed)):
+            raise Exception("NAN values encountered in the image embedding")
+        # embed = batch["embed"]
+        cellline = batch["cell-line"]
+        # cross_embed = [embed, celline]
+        cross_embed = [cellline]
+        if self.include_location:
+            cross_embed.append(batch["location_classes"])
+        return {"c_concat": [img_embed], "c_crossattn": cross_embed}
     
-#     def decode(self, c):
-#         condition_row = c['c_concat']
-#         assert len(condition_row) == 1
-#         with torch.no_grad():
-#             condition_rec_row = [self.image_embedding_model.decode(cond) for cond in condition_row]
-#         n_imgs_per_row = len(condition_rec_row)
-#         condition_rec_row = torch.stack(condition_rec_row)  # n_log_step, n_row, C, H, W
-#         condition_grid = rearrange(condition_rec_row, 'n b c h w -> b n c h w')
-#         condition_grid = rearrange(condition_grid, 'b n c h w -> (b n) c h w')
-#         condition_grid = make_grid(condition_grid, nrow=n_imgs_per_row)
-#         return condition_grid
+    def decode(self, c):
+        condition_row = c['c_concat']
+        assert len(condition_row) == 1
+        with torch.no_grad():
+            condition_rec_row = [self.image_embedding_model.decode(cond) for cond in condition_row]
+        n_imgs_per_row = len(condition_rec_row)
+        condition_rec_row = torch.stack(condition_rec_row)  # n_log_step, n_row, C, H, W
+        condition_grid = rearrange(condition_rec_row, 'n b c h w -> b n c h w')
+        condition_grid = rearrange(condition_grid, 'b n c h w -> (b n) c h w')
+        condition_grid = make_grid(condition_grid, nrow=n_imgs_per_row)
+        return condition_grid
 
 
 if __name__ == "__main__":
@@ -587,4 +527,5 @@ if __name__ == "__main__":
     # HPACombineDatasetMetadataInMemory.generate_cache(f"{HPA_DATA_ROOT}/HPACombineDatasetMetadataInMemory-256-1000.pickle", size=256, total_length=1000)
     # HPACombineDatasetMetadataInMemory.generate_cache(f"{HPA_DATA_ROOT}/HPACombineDatasetMetadataInMemory-256-1000-t5.pickle", size=256, total_length=1000, protein_embedding="t5")
     HPACombineDatasetMetadataInMemory.generate_cache(f"{HPA_DATA_ROOT}/HPACombineDatasetMetadataInMemory-256-t5.pickle", size=256, protein_embedding="t5")
+    # HPACombineDatasetMetadataInMemory.generate_cache(f"{HPA_DATA_ROOT}/HPACombineDatasetMetadataInMemory-256-t5.pickle", size=256, protein_embedding="t5")
     # dump_info(f"{HPA_DATA_ROOT}/HPACombineDatasetInfo.pickle")
