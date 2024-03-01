@@ -13,7 +13,7 @@ def calc_metrics(samples, targets):
     bs, resolution = targets.size(0), targets.size(2)
     assert targets.size() == (bs, 3, resolution, resolution)
     assert samples.size() == (bs, 3, resolution, resolution)
-    assert targets.min() == -1
+    assert targets.min() >= -1  
     assert targets.max() <= 1
 
     targets = (targets + 1) / 2

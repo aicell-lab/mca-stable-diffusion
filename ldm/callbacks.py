@@ -111,7 +111,7 @@ class ImageLogger(Callback):
             grid = (images[k] + 1.0) / 2.0  # -1,1 -> 0,1; c,h,w
             image = wandb.Image(grid)
 
-            tag = f"{split}/batch{batch_idx}_{k}"
+            tag = f"images-{split}/batch{batch_idx}_{k}"
             wandb.log({tag: image}, step=pl_module.global_step)
 
         mse, ssim = calc_metrics(samples, targets)
@@ -167,6 +167,36 @@ class ImageLogger(Callback):
 
             logger_log_images = self.logger_log_images.get(logger, lambda *args, **kwargs: None)
             logger_log_images(pl_module, images, samples, targets, batch_idx, split)
+
+            if is_train:
+                pl_module.train()
+        
+        # add this to use autoencoders logging images
+        elif hasattr(pl_module, "log_images") and callable(pl_module.log_images) and self.max_images > 0:
+            logger = type(pl_module.logger)
+
+            is_train = pl_module.training
+            if is_train:
+                pl_module.eval()
+            
+            with torch.no_grad():
+                img_log = pl_module.log_images(batch)
+
+            for k in img_log:
+                N = min(img_log[k].shape[0], self.max_images)
+                img_log[k] = img_log[k][:N]
+                if isinstance(img_log[k], torch.Tensor):
+                    img_log[k] = img_log[k].detach().cpu()
+                    if self.clamp:
+                        img_log[k] = torch.clamp(img_log[k], -1., 1.)  
+
+            self.log_local(pl_module.logger.save_dir, split, img_log,
+                           pl_module.global_step, pl_module.current_epoch, batch_idx)
+
+            logger_log_images = self.logger_log_images.get(logger, lambda *args, **kwargs: None)
+            # for the autoencoder samples are not interesting
+            # hack the calculate_metrics to return mse and ssim of the reconstructions and inputs
+            logger_log_images(pl_module, img_log, img_log['reconstructions'], img_log['inputs'], batch_idx, split)
 
             if is_train:
                 pl_module.train()

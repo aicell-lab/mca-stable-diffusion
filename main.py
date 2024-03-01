@@ -12,9 +12,11 @@ from pytorch_lightning import seed_everything
 from pytorch_lightning.trainer import Trainer
 
 from ldm.data.base import Txt2ImgIterableBaseDataset
+from ldm.data.mca import MCACombineDataset
 from ldm.parse import get_parser, separate_args
 from ldm.util import instantiate_from_config, send_message_to_slack
 from memory_profiler import profile
+import wandb
 
 
 class WrappedDataset(Dataset):
@@ -35,7 +37,7 @@ def worker_init_fn(_):
     dataset = worker_info.dataset
     worker_id = worker_info.id
 
-    if isinstance(dataset, Txt2ImgIterableBaseDataset):
+    if isinstance(dataset, Txt2ImgIterableBaseDataset):  ## MCACombineDataset):
         split_size = dataset.num_records // worker_info.num_workers
         # reset num_records to the true number to retain reliable length information
         dataset.sample_ids = dataset.valid_ids[worker_id * split_size:(worker_id + 1) * split_size]
@@ -88,7 +90,7 @@ class DataModuleFromConfig(pl.LightningDataModule):
             init_fn = None
         return DataLoader(self.datasets["train"], batch_size=self.batch_size,
                           num_workers=self.num_workers, shuffle=False if is_iterable_dataset else True,
-                          worker_init_fn=init_fn, persistent_workers=self.num_workers > 0,pin_memory=True)
+                          worker_init_fn=init_fn, persistent_workers=self.num_workers > 0,pin_memory=False) # changed pin_mem
 
     def _val_dataloader(self, shuffle=False):
         if isinstance(self.datasets['validation'], Txt2ImgIterableBaseDataset) or self.use_worker_init_fn:
@@ -99,7 +101,7 @@ class DataModuleFromConfig(pl.LightningDataModule):
                           batch_size=self.batch_size,
                           num_workers=self.num_workers,
                           worker_init_fn=init_fn,
-                          shuffle=shuffle, persistent_workers=self.num_workers > 0, pin_memory=True)
+                          shuffle=shuffle, persistent_workers=self.num_workers > 0, pin_memory=False) # changed
 
     def _test_dataloader(self, shuffle=False):
         is_iterable_dataset = isinstance(self.datasets['train'], Txt2ImgIterableBaseDataset)
@@ -166,30 +168,34 @@ def main(opt, logdir, nowname):
     # trainer and callbacks
     trainer_kwargs = dict()
 
+    config_to_log = {}
+
     # default logger configs
     default_logger_cfgs = {
-        # "wandb": {
-        #     "target": "pytorch_lightning.loggers.WandbLogger",
-        #     "params": {
-        #         "name": nowname,
-        #         "save_dir": logdir,
-        #         # "offline": opt.debug,
-        #         "offline": False,
-        #         "id": nowname,
-        #         "project": "super-multiplex-cell",
-        #         "config": config_to_log,
-        #         "resume": "allow",
-        #     }
-        #},
-        "testtube": {
-            "target": "pytorch_lightning.loggers.TestTubeLogger",
-            "params": {
-                "name": "testtube",
-                "save_dir": logdir,
+        "wandb": {
+             "target": "pytorch_lightning.loggers.WandbLogger",
+             "params": {
+                 "name": nowname,
+                "save_dir": logdir, 
+                # "offline": opt.debug,
+                 #"offline": False,
+                 #"mode": "online", # changed from offline to mode which can be online/offline
+                 #"id": nowname,
+                 "project": "hpa-image-log-test",
+                 #"config": config_to_log,
+                 #"resume": "allow",
+                 # must link to wandb somehow as anonymous is set to never (default)
             }
+        #},
+        #"testtube": {
+        #    "target": "pytorch_lightning.loggers.TestTubeLogger",
+        #    "params": {
+        #        "name": "testtube",
+        #        "save_dir": logdir,
+        #    }
         },
     }
-    default_logger_cfg = default_logger_cfgs["testtube"]
+    default_logger_cfg = default_logger_cfgs["wandb"]
     if "logger" in lightning_config:
         logger_cfg = lightning_config.logger
     else:
@@ -475,6 +481,8 @@ if __name__ == "__main__":
         logdir = os.path.join(opt.logdir, "debug_logs" if opt.debug else "logs", nowname)
         os.makedirs(logdir)
     # wandb.init(project="super-multiplex-cell", config=opt, resume="allow", settings=wandb.Settings(start_method="fork"), name=nowname, mode="offline" if opt.debug else "online", id=nowname)
+    wandb.login(key='54afc5be46e10fbcdceca895ba75d2451da3d299')
+
     if opt.debug:
         main(opt, logdir, nowname)
     else:
