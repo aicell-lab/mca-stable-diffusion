@@ -90,7 +90,7 @@ class DataModuleFromConfig(pl.LightningDataModule):
             init_fn = None
         return DataLoader(self.datasets["train"], batch_size=self.batch_size,
                           num_workers=self.num_workers, shuffle=False if is_iterable_dataset else True,
-                          worker_init_fn=init_fn, persistent_workers=self.num_workers > 0,pin_memory=False) # changed pin_mem
+                          worker_init_fn=init_fn, persistent_workers=self.num_workers > 0,pin_memory=True) 
 
     def _val_dataloader(self, shuffle=False):
         if isinstance(self.datasets['validation'], Txt2ImgIterableBaseDataset) or self.use_worker_init_fn:
@@ -101,7 +101,7 @@ class DataModuleFromConfig(pl.LightningDataModule):
                           batch_size=self.batch_size,
                           num_workers=self.num_workers,
                           worker_init_fn=init_fn,
-                          shuffle=shuffle, persistent_workers=self.num_workers > 0, pin_memory=False) # changed
+                          shuffle=shuffle, persistent_workers=self.num_workers > 0, pin_memory=True) 
 
     def _test_dataloader(self, shuffle=False):
         is_iterable_dataset = isinstance(self.datasets['train'], Txt2ImgIterableBaseDataset)
@@ -160,6 +160,8 @@ def main(opt, logdir, nowname):
             trainer_opt.profiler = pl.profiler.SimpleProfiler(dirpath=logdir, filename="perf_logs")
         elif trainer_opt.profiler == "advanced":
             trainer_opt.profiler = pl.profiler.AdvancedProfiler(dirpath=logdir, filename="perf_logs")
+        elif trainer_opt.profiler == "pytorch profiler":
+                trainer_opt.profiler = pl.profiler.PyTorchProfiler(dirpath=logdir, filename="perf_logs")
     lightning_config.trainer = trainer_config
 
     # model
@@ -167,8 +169,7 @@ def main(opt, logdir, nowname):
 
     # trainer and callbacks
     trainer_kwargs = dict()
-
-    config_to_log = {}
+   
 
     # default logger configs
     default_logger_cfgs = {
@@ -181,8 +182,8 @@ def main(opt, logdir, nowname):
                  #"offline": False,
                  #"mode": "online", # changed from offline to mode which can be online/offline
                  #"id": nowname,
-                 "project": "hpa-image-log-test",
-                 #"config": config_to_log,
+                 "project": "test-num-gpus-more-data",
+                 #"config": config_to_log, # gives unexpected error, TypeError unless dict is empty
                  #"resume": "allow",
                  # must link to wandb somehow as anonymous is set to never (default)
             }
@@ -380,8 +381,10 @@ def main(opt, logdir, nowname):
     #     dst = os.path.join(dst, "debug_runs", name)
     #     os.makedirs(os.path.split(dst)[0], exist_ok=True)
     #     os.rename(logdir, dst)
+    print('at the very end')
     if trainer.global_rank == 0:
         print(trainer.profiler.summary())
+        print('after printing profiler summary')
 
 
 if __name__ == "__main__":
