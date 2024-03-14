@@ -111,7 +111,7 @@ class ImageLogger(Callback):
             grid = (images[k] + 1.0) / 2.0  # -1,1 -> 0,1; c,h,w
             image = wandb.Image(grid)
 
-            tag = f"images-{split}/batch{batch_idx}_{k}"
+            tag = f"images-{split}/gs{pl_module.global_step}_{k}"
             wandb.log({tag: image}, step=pl_module.global_step)
 
         mse, ssim = calc_metrics(samples, targets)
