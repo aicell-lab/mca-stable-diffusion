@@ -182,9 +182,10 @@ def main(opt, logdir, nowname):
                  #"offline": False,
                  #"mode": "online", # changed from offline to mode which can be online/offline
                  #"id": nowname,
-                 "project": "test-num-gpus-more-data",
+                 #"id": "scilifelab-ddls/train-autoencoder-mca/wtcurq79",
+                 "project": "train-autoencoder-mca",
                  #"config": config_to_log, # gives unexpected error, TypeError unless dict is empty
-                 #"resume": "allow",
+                 #"resume": "must"
                  # must link to wandb somehow as anonymous is set to never (default)
             }
         #},
@@ -213,6 +214,7 @@ def main(opt, logdir, nowname):
             "filename": "{epoch:06}",
             "verbose": True,
             "save_last": True,
+            "save_on_train_epoch_end": False
         }
     }
     if hasattr(model, "monitor"):
@@ -251,13 +253,13 @@ def main(opt, logdir, nowname):
                 "clamp": True
             }
         },
-        "learning_rate_logger": {
-            "target": "pytorch_lightning.callbacks.LearningRateMonitor",
-            "params": {
-                "logging_interval": "step",
-                # "log_momentum": True
-            }
-        },
+        #"learning_rate_logger": {
+        #    "target": "pytorch_lightning.callbacks.LearningRateMonitor",
+        #    "params": {
+        #        "logging_interval": "step",
+        #        # "log_momentum": True
+        #    }
+        #},
         "cuda_callback": {
             "target": "ldm.callbacks.CUDACallback"
         },
@@ -267,6 +269,10 @@ def main(opt, logdir, nowname):
     }
     if version.parse(pl.__version__) >= version.parse('1.4.0'):
         default_callbacks_cfg.update({'checkpoint_callback': modelckpt_cfg})
+
+    
+    #if type(model) == ldm.models.autoencoder.VQModel:
+    #    default_callbacks_cfg.pop('learning_rate_logger')
 
     if "callbacks" in lightning_config:
         callbacks_cfg = lightning_config.callbacks
@@ -381,10 +387,11 @@ def main(opt, logdir, nowname):
     #     dst = os.path.join(dst, "debug_runs", name)
     #     os.makedirs(os.path.split(dst)[0], exist_ok=True)
     #     os.rename(logdir, dst)
-    print('at the very end')
+    
+
     if trainer.global_rank == 0:
         print(trainer.profiler.summary())
-        print('after printing profiler summary')
+        
 
 
 if __name__ == "__main__":
