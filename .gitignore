@@ -4,6 +4,7 @@ logs
 *.png
 taming
 src
+batch_scripts 
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -133,6 +134,9 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+
+# Apptainer images
+*.sif
 
 # Spyder project settings
 .spyderproject
