@@ -40,14 +40,14 @@ data:
     train:
       target: ldm.data.mca.MCACombineDataset
       params:
-        directories: '/data/ethyni/mca/mitotic_cell_atlas_v1.0.1_exampledata/Data_tifs /data/ethyni/mca/v1.1_exdata'
+        directories: '/proj/aicell/data/stable-diffusion/mca/mitotic_cell_atlas_v1.0.1_fulldata/Data_tifs /proj/aicell/data/stable-diffusion/mca/ftp.ebi.ac.uk/pub/databases/IDR/idr0052-walther-condensinmap/20181113-ftp/MitoSys'
         cell_features: '/data/ethyni/mca/cell_features_necessary_columns.txt'
         group: 'train'
         
     validation:
       target: ldm.data.mca.MCACombineDataset
       params:
-        directories: '/data/ethyni/mca/mitotic_cell_atlas_v1.0.1_exampledata/Data_tifs /data/ethyni/mca/v1.1_exdata'
+        directories: '/proj/aicell/data/stable-diffusion/mca/mitotic_cell_atlas_v1.0.1_fulldata/Data_tifs /proj/aicell/data/stable-diffusion/mca/ftp.ebi.ac.uk/pub/databases/IDR/idr0052-walther-condensinmap/20181113-ftp/MitoSys'
         cell_features: '/data/ethyni/mca/cell_features_necessary_columns.txt'
         group: 'validation'
 
