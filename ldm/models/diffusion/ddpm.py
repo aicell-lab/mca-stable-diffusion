@@ -681,12 +681,13 @@ class LatentDiffusion(DDPM):
             if cond_key is None:
                 cond_key = self.cond_stage_key
             if cond_key != self.first_stage_key:
-                if cond_key in ['caption', 'coordinates_bbox']:
+                if cond_key in ['caption', 'coordinates_bbox', 'labels']:  # added labels for mca dataset
                     xc = batch[cond_key]
                 elif cond_key == 'class_label':
                     xc = batch
                 elif cond_key == 'hybrid-conditions':
                     xc = batch
+                
                 else:
                     xc = super().get_input(batch, cond_key).to(self.device)
             else:
@@ -1349,9 +1350,11 @@ class LatentDiffusion(DDPM):
             columns = []
 
             c = self.cond_stage_model(batch)
+            #Added this line for mca, don't really know what it does
+            uc = {'c_concat': [torch.zeros_like(c)], 'c_crossattn': [c]} 
             # uc = {'c_concat': [torch.zeros_like(v) for v in c['c_concat']], 'c_crossattn': [torch.zeros_like(v) for v in c['c_crossattn']]} 
             # Keep the c_concat and set c_crossattn to zero
-            uc = {'c_concat': c['c_concat'], 'c_crossattn': [torch.zeros_like(v) for v in c['c_crossattn']]} 
+            #uc = {'c_concat': c['c_concat'], 'c_crossattn': [torch.zeros_like(v) for v in c['c_crossattn']]} 
 
             # shape = (c['c_concat'][0].shape[1],)+c['c_concat'][0].shape[2:]
             # z_denoise_row = None
