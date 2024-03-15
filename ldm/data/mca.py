@@ -12,6 +12,8 @@ import cv2
 from skimage.transform import rotate
 import json
 import time
+import torch.nn as nn
+import torch
 
 # all available proteins from v1.0.1 and v1.1
 protein_dict = {'APC2': 0, 'AURKB': 1, 'BUB1': 2, 'BUBR1': 3, 
@@ -132,6 +134,7 @@ class MCACombineDataset(Dataset):
 
             # Combine the rescaled channels back into an image
             image = np.stack((rescaled_r, rescaled_g, rescaled_b), axis=-1)
+            del rescaled_r, rescaled_g, rescaled_b
         
         # add noise to the images
         if self.add_noise:
@@ -146,12 +149,12 @@ class MCACombineDataset(Dataset):
             else:
                 raise NotImplementedError
             image = np.clip(image+noise, -1, 1)
+            del noise
 
 
         if self.random_angle:
             angle = 360 * random.random()  # random float angle in degrees        
             image = rotate(image, angle, mode=self.rotation_mode)  # rotate image
-            print(angle, 'angle in preprocess test to see it doesnt give the same all the time with global seed')
         
         return image
             
