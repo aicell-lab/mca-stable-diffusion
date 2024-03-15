@@ -2,7 +2,7 @@ model:
   base_learning_rate: 5.0e-5   # set to target_lr by starting main.py with '--scale_lr False'
   target: ldm.models.diffusion.ddpm.LatentDiffusion
   params:
-    # ckpt_path: /data/wei/stable-diffusion/logs/2022-11-06T02-58-38_hpa-ldm-vq-4-hybrid-debug/checkpoints/last.ckpt
+    ckpt_path: /proj/aicell/data/stable-diffusion/mca/logs/2024-03-14T15-56-18_mca_test/checkpoints/last.ckpt
     linear_start: 0.0015
     linear_end: 0.0155
     num_timesteps_cond: 1
@@ -43,15 +43,15 @@ model:
         use_scale_shift_norm: True
         resblock_updown: True
         use_spatial_transformer: True
-        context_dim: 128
+        context_dim: 128 # must match the output of MCALabelEmbedder
 
     first_stage_config:
       target: ldm.models.autoencoder.VQModelInterface
       params:
         embed_dim: 3
         n_embed: 8192
-        # autoencoder for the reference + protein channel
-        ckpt_path: /data/ethyni/stable-diffusion/logs/2024-03-01T15-36-00_autoencoder_vq_f4_mca/checkpoints/last.ckpt
+        # pretrained autoencoder
+        ckpt_path: /proj/aicell/data/stable-diffusion/mca/logs/ae-keep-2024-03-11T16-16-14_autoencoder_vq_f4_mca_data/checkpoints/epoch=000001-v1.ckpt
         ddconfig:
           double_z: false
           z_channels: 3
@@ -80,29 +80,35 @@ data:
   target: main.DataModuleFromConfig
   params:
     batch_size: 2
-    # num_workers: 0 # disable multiprocessing
+    #num_workers: 16 # disable multiprocessing
     wrap: True # used to be True
     train:
       target: ldm.data.mca.MCACombineDataset
       params:
-        directories: "/data/ethyni/mca/mitotic_cell_atlas_v1.0.1_exampledata/Data_tifs"
-        cell_features: "/data/ethyni/mca/mitotic_cell_atlas_v1.0.1_exampledata/Data_tifs/new_cell_features.txt"
+        directories: "/proj/aicell/data/stable-diffusion/mca/mitotic_cell_atlas_v1.0.1_fulldata/Data_tifs /proj/aicell/data/stable-diffusion/mca/ftp.ebi.ac.uk/pub/databases/IDR/idr0052-walther-condensinmap/20181113-ftp/MitoSys"
+        cell_features: /proj/aicell/data/stable-diffusion/mca/cell_features_necessary_columns.txt
         group: 'train' 
-        use_cached_paths: False    
+        use_cached_paths: True 
+        cached_paths: /proj/aicell/data/stable-diffusion/mca/train-90-data-mca.json   
+        normalization: True
+        random_angle: True
     validation:
       target: ldm.data.mca.MCACombineDataset
       params:
-        directories: "/data/ethyni/mca/mitotic_cell_atlas_v1.0.1_exampledata/Data_tifs"
-        cell_features: "/data/ethyni/mca/mitotic_cell_atlas_v1.0.1_exampledata/Data_tifs/new_cell_features.txt"
+        directories: "/proj/aicell/data/stable-diffusion/mca/mitotic_cell_atlas_v1.0.1_fulldata/Data_tifs /proj/aicell/data/stable-diffusion/mca/ftp.ebi.ac.uk/pub/databases/IDR/idr0052-walther-condensinmap/20181113-ftp/MitoSys"
+        cell_features: /proj/aicell/data/stable-diffusion/mca/cell_features_necessary_columns.txt
         group: 'validation'
-        use_cached_paths: False
+        use_cached_paths: True
+        cached_paths: /proj/aicell/data/stable-diffusion/mca/train-90-data-mca.json
+        normalization: True
+        random_angle: True
 
 lightning:
   callbacks:
     image_logger:
       target: ldm.callbacks.ImageLogger
       params:
-        batch_frequency: 10
+        batch_frequency: 50
         max_images: 4
         increase_log_steps: false
         log_images_kwargs:
@@ -110,18 +116,18 @@ lightning:
           quantize_denoised: true
           inpaint: false
           plot_denoise_rows: true
-          plot_progressive_rows: false
+          plot_progressive_rows: true
           plot_diffusion_rows: true
-          plot_inputs: false
-          plot_reconstructions: false
+          plot_inputs: true
+          plot_reconstructions: true
           mix_sample: false
-          n_row: 4
+          n_row: 1
 
   trainer:
     benchmark: True
     accelerator: dp # need to change to dp because the default ddp will free the training
     # limit_val_batches: 100
-    #fast_dev_run: 5
+    #fast_dev_run: True 
     #profiler: pytorch
     limit_train_batches: 100
-    limit_val_batches: 10
+    limit_val_batches: 1
