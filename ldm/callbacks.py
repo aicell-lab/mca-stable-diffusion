@@ -340,8 +340,6 @@ class CustomEarlyStopping(EarlyStopping):
         pass
 
     def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx):
-    #def on_train_end(self, trainer, pl_module):
-        print(pl_module.global_step, 'early stopping custom callback gs')
-        if pl_module.global_step % self.check_frequency_gs == 0:
+        if (pl_module.global_step % self.check_frequency_gs == 0) and pl_module.global_step != 0:
             print('Checking early stop at global step', pl_module.global_step)
             self._run_early_stopping_check(trainer)
