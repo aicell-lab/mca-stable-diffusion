@@ -343,3 +343,5 @@ class CustomEarlyStopping(EarlyStopping):
         if (pl_module.global_step % self.check_frequency_gs == 0) and pl_module.global_step != 0:
             print('Checking early stop at global step', pl_module.global_step)
             self._run_early_stopping_check(trainer)
+            if trainer.should_stop is True:
+                trainer.limit_val_batches = 0
