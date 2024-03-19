@@ -206,13 +206,12 @@ class MCACombineDataset(Dataset):
 
 class MCALabelEmbedder(nn.Module):
     
-    def __init__(self, place_holder_arg, *args, **kwargs) -> None:
+    def __init__(self, layer_1_size, output_size_context_dim, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.stuff = place_holder_arg
         self.label_embedder = nn.Sequential(
-                nn.Linear(len(protein_dict.keys()) + 2, 128),
+                nn.Linear(len(protein_dict.keys()) + 2, layer_1_size),
                 nn.ReLU(),
-                nn.Linear(128, 128),
+                nn.Linear(layer_1_size, output_size_context_dim),
             )
     
 
