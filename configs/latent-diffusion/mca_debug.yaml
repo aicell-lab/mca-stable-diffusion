@@ -2,7 +2,11 @@ model:
   base_learning_rate: 1 #5.0e-5   # set to target_lr by starting main.py with '--scale_lr False'
   target: ldm.models.diffusion.ddpm.LatentDiffusion
   params:
+<<<<<<< HEAD:configs/latent-diffusion/mca_test.yaml
     #ckpt_path: /data/ethyni/stable-diffusion/logs/temp/ldm-berzelius.ckpt
+=======
+    ckpt_path: /proj/aicell/data/stable-diffusion/mca/logs/2024-03-14T15-56-18_mca_test/checkpoints/last.ckpt
+>>>>>>> baf07e24c434e95072d0231de3a1e103c34241cb:configs/latent-diffusion/mca_debug.yaml
     linear_start: 0.0015
     linear_end: 0.0155
     num_timesteps_cond: 1
@@ -43,15 +47,20 @@ model:
         use_scale_shift_norm: True
         resblock_updown: True
         use_spatial_transformer: True
-        context_dim: 128
+        context_dim: 128 # must match the output of MCALabelEmbedder
 
     first_stage_config:
       target: ldm.models.autoencoder.VQModelInterface
       params:
         embed_dim: 3
         n_embed: 8192
+<<<<<<< HEAD:configs/latent-diffusion/mca_test.yaml
         # autoencoder for the reference + protein channel
         #ckpt_path: /data/ethyni/stable-diffusion/logs/temp/autoencoder-berzelius.ckpt
+=======
+        # pretrained autoencoder
+        ckpt_path: /proj/aicell/data/stable-diffusion/mca/logs/ae-keep-2024-03-11T16-16-14_autoencoder_vq_f4_mca_data/checkpoints/epoch=000001-v1.ckpt
+>>>>>>> baf07e24c434e95072d0231de3a1e103c34241cb:configs/latent-diffusion/mca_debug.yaml
         ddconfig:
           double_z: false
           z_channels: 3
@@ -79,12 +88,18 @@ model:
 data:
   target: main.DataModuleFromConfig
   params:
+<<<<<<< HEAD:configs/latent-diffusion/mca_test.yaml
     batch_size: 4
     # num_workers: 0 # disable multiprocessing
+=======
+    batch_size: 2
+    #num_workers: 16 # disable multiprocessing
+>>>>>>> baf07e24c434e95072d0231de3a1e103c34241cb:configs/latent-diffusion/mca_debug.yaml
     wrap: True # used to be True
     train:
       target: ldm.data.mca.MCACombineDataset
       params:
+<<<<<<< HEAD:configs/latent-diffusion/mca_test.yaml
         directories: "/data/ethyni/mca/mitotic_cell_atlas_v1.0.1_exampledata/Data_tifs"
         cell_features: "/data/ethyni/mca/cell_features_necessary_columns.txt"
         group: 'train' 
@@ -98,13 +113,36 @@ data:
         group: 'validation'
         use_cached_paths: true
         cached_paths: /data/ethyni/stable-diffusion/ldm/data/europa-paths.json 
+=======
+        directories: "/proj/aicell/data/stable-diffusion/mca/mitotic_cell_atlas_v1.0.1_fulldata/Data_tifs /proj/aicell/data/stable-diffusion/mca/ftp.ebi.ac.uk/pub/databases/IDR/idr0052-walther-condensinmap/20181113-ftp/MitoSys"
+        cell_features: /proj/aicell/data/stable-diffusion/mca/cell_features_necessary_columns.txt
+        group: 'train' 
+        use_cached_paths: True 
+        cached_paths: /proj/aicell/data/stable-diffusion/mca/train-90-data-mca.json   
+        normalization: True
+        random_angle: True
+    validation:
+      target: ldm.data.mca.MCACombineDataset
+      params:
+        directories: "/proj/aicell/data/stable-diffusion/mca/mitotic_cell_atlas_v1.0.1_fulldata/Data_tifs /proj/aicell/data/stable-diffusion/mca/ftp.ebi.ac.uk/pub/databases/IDR/idr0052-walther-condensinmap/20181113-ftp/MitoSys"
+        cell_features: /proj/aicell/data/stable-diffusion/mca/cell_features_necessary_columns.txt
+        group: 'validation'
+        use_cached_paths: True
+        cached_paths: /proj/aicell/data/stable-diffusion/mca/train-90-data-mca.json
+        normalization: True
+        random_angle: True
+>>>>>>> baf07e24c434e95072d0231de3a1e103c34241cb:configs/latent-diffusion/mca_debug.yaml
 
 lightning:
   callbacks:
     image_logger:
       target: ldm.callbacks.ImageLogger
       params:
+<<<<<<< HEAD:configs/latent-diffusion/mca_test.yaml
         batch_frequency: 25
+=======
+        batch_frequency: 50
+>>>>>>> baf07e24c434e95072d0231de3a1e103c34241cb:configs/latent-diffusion/mca_debug.yaml
         max_images: 4
         increase_log_steps: false
         log_images_kwargs:
@@ -112,9 +150,13 @@ lightning:
           quantize_denoised: true
           inpaint: false
           plot_denoise_rows: true
-          plot_progressive_rows: false
+          plot_progressive_rows: true
           plot_diffusion_rows: true
+<<<<<<< HEAD:configs/latent-diffusion/mca_test.yaml
           plot_inputs: false
+=======
+          plot_inputs: true
+>>>>>>> baf07e24c434e95072d0231de3a1e103c34241cb:configs/latent-diffusion/mca_debug.yaml
           plot_reconstructions: true
           mix_sample: false
           n_row: 1
@@ -123,9 +165,13 @@ lightning:
     benchmark: True
     accelerator: dp # need to change to dp because the default ddp will free the training
     # limit_val_batches: 100
-    #fast_dev_run: 5
+    #fast_dev_run: True 
     #profiler: pytorch
     limit_train_batches: 100
+<<<<<<< HEAD:configs/latent-diffusion/mca_test.yaml
     limit_val_batches: 1
     #max_epoch: 1
     resume_from_checkpoint: /data/ethyni/stable-diffusion/logs/temp/ldm-berzelius.ckpt
+=======
+    limit_val_batches: 1
+>>>>>>> baf07e24c434e95072d0231de3a1e103c34241cb:configs/latent-diffusion/mca_debug.yaml

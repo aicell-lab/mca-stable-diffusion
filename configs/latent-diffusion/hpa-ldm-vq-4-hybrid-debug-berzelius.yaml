@@ -50,7 +50,7 @@ model:
         embed_dim: 3
         n_embed: 8192
         # autoencoder for the reference + protein channel
-        ckpt_path: /proj/aicell/data/stable-diffusion-logs-hpa/autoencoder_vq-4-hpa/last.ckpt
+        ckpt_path: /proj/aicell/data/stable-diffusion/hpa/logs/autoencoder_vq-4-hpa/last.ckpt
         ddconfig:
           double_z: false
           z_channels: 3
@@ -76,7 +76,7 @@ model:
           params:
             embed_dim: 3
             n_embed: 8192
-            ckpt_path: /proj/aicell/data/stable-diffusion-logs-hpa/autoencoder_vq-4-hpa/last.ckpt
+            ckpt_path: /proj/aicell/data/stable-diffusion/hpa/logs/autoencoder_vq-4-hpa/last.ckpt
             ddconfig:
               double_z: false
               z_channels: 3
@@ -119,7 +119,7 @@ data:
         seed: 123
         train_split_ratio: 0.95
         group: 'train'
-        cache_file: /proj/aicell/data/hpa-webdataset-all-composite/HPACombineDatasetMetadataInMemory-256-1000.pickle
+        cache_file: /proj/aicell/data/stable-diffusion/hpa/hpa-webdataset-all-composite/HPACombineDatasetMetadataInMemory-256-1000.pickle
         channels: [0, 1, 2]
     validation:
       target: ldm.data.hpa.HPACombineDatasetMetadataInMemory
@@ -127,7 +127,7 @@ data:
         seed: 123
         train_split_ratio: 0.95
         group: 'validation'
-        cache_file: /proj/aicell/data/hpa-webdataset-all-composite/HPACombineDatasetMetadataInMemory-256-1000.pickle
+        cache_file: /proj/aicell/data/stable-diffusion/hpa/hpa-webdataset-all-composite/HPACombineDatasetMetadataInMemory-256-1000.pickle
         channels: [0, 1, 2]
 
 lightning:

@@ -1,0 +1,86 @@
+model:
+  base_learning_rate: 4.5e-06
+  target: ldm.models.autoencoder.VQModel
+  params:
+    embed_dim: 3
+    n_embed: 8192
+    monitor: val/rec_loss
+    ckpt_path:  /proj/aicell/data/stable-diffusion/mca/logs/2024-03-09T04-40-26_autoencoder_vq_f4_mca_data/checkpoints/last.ckpt
+
+    ddconfig:
+      double_z: false
+      z_channels: 3
+      resolution: 256
+      in_channels: 3
+      out_ch: 3
+      ch: 128
+      ch_mult:
+      - 1
+      - 2
+      - 4
+      num_res_blocks: 2
+      attn_resolutions: []
+      dropout: 0.0
+    lossconfig:
+      target: ldm.modules.losses.vqperceptual.VQLPIPSWithDiscriminator
+      params:
+        disc_conditional: false
+        disc_in_channels: 3
+        disc_start: 0
+        disc_weight: 0.75
+        codebook_weight: 1.0
+        n_classes: 8192
+
+data:
+  target: main.DataModuleFromConfig
+  params:
+    batch_size: 8
+    num_workers: 8
+    wrap: True
+    train:
+      target: ldm.data.mca.MCACombineDataset
+      params:
+        directories: '/proj/aicell/data/stable-diffusion/mca/ftp.ebi.ac.uk/pub/databases/IDR/idr0052-walther-condensinmap/20181113-ftp/MitoSys /proj/aicell/data/stable-diffusion/mca/mitotic_cell_atlas_v1.0.1_fulldata/Data_tifs'
+        cell_features: /proj/aicell/data/stable-diffusion/mca/cell_features_necessary_columns.txt
+        group: 'train'
+        image_path: '*/*/rawtif/*.tif'
+        use_cached_paths: True
+        cached_paths: /proj/aicell/data/stable-diffusion/mca/train-90-data-mca.json
+        random_angle: True
+        normalization: True
+        add_noise: False
+        
+    validation:
+      target: ldm.data.mca.MCACombineDataset
+      params:
+        directories: '/proj/aicell/data/stable-diffusion/mca/ftp.ebi.ac.uk/pub/databases/IDR/idr0052-walther-condensinmap/20181113-ftp/MitoSys /proj/aicell/data/stable-diffusion/mca/mitotic_cell_atlas_v1.0.1_fulldata/Data_tifs'
+        cell_features: /proj/aicell/data/stable-diffusion/mca/cell_features_necessary_columns.txt
+        group: 'validation'
+        image_path: '*/*/rawtif/*.tif'
+        use_cached_paths: True
+        cached_paths: /proj/aicell/data/stable-diffusion/mca/train-90-data-mca.json
+        random_angle: True
+        normalization: True
+        add_noise: False
+
+lightning:
+  callbacks:
+    image_logger:
+      target: ldm.callbacks.ImageLogger
+      params:
+        batch_frequency: 500
+        max_images: 1
+        increase_log_steps: False
+        log_on_batch_idx: False
+
+  trainer:
+    benchmark: True
+    accumulate_grad_batches: 2
+    max_epochs: 10 # 1000 is default value for pl trainer
+    val_check_interval: 0.1 # check validation every nth batch or float, eg 0.25 => check 4 times over the epoch
+    #limit_train_batches: 
+    #limit_val_batches: 0.01
+    #fast_dev_run: True
+    #max_steps: 500
+    #precision: 16
+    # auto_scale_batch_size: binsearch # cannot use this for autoencoder as it does not have a self.batch_size
