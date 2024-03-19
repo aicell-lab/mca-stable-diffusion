@@ -176,15 +176,18 @@ def main(opt, logdir, nowname):
         "wandb": {
              "target": "pytorch_lightning.loggers.WandbLogger",
              "params": {
-                 "name": nowname,
+                 #"name": nowname,
+                 "name": "test custom es, lr, image logger etc " + now,
                 "save_dir": logdir, 
                 # "offline": opt.debug,
                  #"offline": False,
                  #"mode": "online", # changed from offline to mode which can be online/offline
                  #"id": nowname,
-                 "project": "test-num-gpus-more-data",
+                 #"id": "cytnqlfv",
+                 "id": "test-es",
+                 "project": "test-embedding",
                  #"config": config_to_log, # gives unexpected error, TypeError unless dict is empty
-                 #"resume": "allow",
+                 "resume": "allow"
                  # must link to wandb somehow as anonymous is set to never (default)
             }
         #},
@@ -264,6 +267,19 @@ def main(opt, logdir, nowname):
         "cpu_mem_monitor": {
             "target": "ldm.callbacks.CPUMemoryMonitor"
         },
+        "early_stopping_callback":{
+            "target": "ldm.callbacks.CustomEarlyStopping",
+            "params": {
+            #"monitor": "val/loss_simple_ema", 
+            "monitor": "train/loss_step",
+            "mode": "min", 
+            "patience": 5,
+            "min_delta": 0.001, 
+            #"divergence_threshold": 0.78, 
+            "check_on_train_epoch_end": False, # run early stopping at the end of validation
+            "verbose": True,
+            "check_frequency_gs": 10}
+        }
     }
     if version.parse(pl.__version__) >= version.parse('1.4.0'):
         default_callbacks_cfg.update({'checkpoint_callback': modelckpt_cfg})
