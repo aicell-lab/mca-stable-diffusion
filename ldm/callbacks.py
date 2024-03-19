@@ -17,6 +17,7 @@ import wandb
 
 from ldm.evaluation.metrics import calc_metrics
 from ldm.util import send_message_to_slack, send_image_to_slack
+from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 
 
 class SetupCallback(Callback):
@@ -327,3 +328,20 @@ class CPUMemoryMonitor(Callback):
 
     def on_validation_epoch_end(self, trainer, pl_module):
         print("End of validation epoch", self.str())
+
+
+class CustomEarlyStopping(EarlyStopping):
+    """Custom early stopping to check more often than after every epoch or after validation"""
+    def __init__(self, *args, check_frequency_gs, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.check_frequency_gs = check_frequency_gs
+
+    def on_validation_end(self, trainer, pl_module) -> None:
+        pass
+
+    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx):
+    #def on_train_end(self, trainer, pl_module):
+        print(pl_module.global_step, 'early stopping custom callback gs')
+        if pl_module.global_step % self.check_frequency_gs == 0:
+            print('Checking early stop at global step', pl_module.global_step)
+            self._run_early_stopping_check(trainer)
