@@ -1,8 +1,8 @@
 model:
-  base_learning_rate: 5.0e-5   # set to target_lr by starting main.py with '--scale_lr False'
+  base_learning_rate: 1 # learning rate with lr_scheduler #5.0e-5   # set to target_lr by starting main.py with '--scale_lr False'
   target: ldm.models.diffusion.ddpm.LatentDiffusion
   params:
-    ckpt_path: /proj/aicell/data/stable-diffusion/mca/logs/2024-03-14T15-56-18_mca_test/checkpoints/last.ckpt
+    #ckpt_path: /proj/aicell/data/stable-diffusion/mca/logs/2024-03-14T15-56-18_mca_test/checkpoints/last.ckpt
     linear_start: 0.0015
     linear_end: 0.0155
     num_timesteps_cond: 1
@@ -20,20 +20,21 @@ model:
     scale_by_std: true
     monitor: 'val/loss_simple_ema'
 
-    # scheduler_config: # 10000 warmup steps
-    #   target: ldm.lr_scheduler.LambdaLinearScheduler
-    #   params:
-    #     warm_up_steps: [10000]
-    #     cycle_lengths: [10000000000000]
-    #     f_start: [1.e-6]
-    #     f_max: [ 1.e-6 ]
-    #     f_min: [ 1.e-6 ]
+    scheduler_config: # 10000 warmup steps
+       target: ldm.lr_scheduler.LambdaLinearScheduler
+       params:
+         warm_up_steps: [1000, 1000, 1000, 1000, 1000, 1000, 1000]
+         cycle_lengths: [9000, 9000, 9000, 9000, 9000, 9000, 9000]
+         f_start: [1.e-6, 1.e-6, 1.e-6, 1.e-6, 1.e-6, 1.e-6, 1.e-6]
+         f_max: [ 1.e-6 ]
+         f_min: [ 1.e-6 ]
+         verbosity_interval: 100
 
     unet_config:
       target: ldm.modules.diffusionmodules.openaimodel.UNetModel
       params:
         image_size: 64 # 256/4
-        in_channels: 3 # why in_channels 6? should be 3 for me
+        in_channels: 3 
         out_channels: 3
         model_channels: 192
         attention_resolutions: [ 1, 2, 4, 8 ]   # 32, 16, 8, 4
@@ -72,15 +73,16 @@ model:
     cond_stage_config:
       target: ldm.data.mca.MCALabelEmbedder
       params:
-        place_holder_arg: True
+        layer_1_size: 128
+        output_size_context_dim: 128
         
 
 
 data:
   target: main.DataModuleFromConfig
   params:
-    batch_size: 2
-    #num_workers: 16 # disable multiprocessing
+    batch_size: 8
+    num_workers: 4 # disable multiprocessing
     wrap: True # used to be True
     train:
       target: ldm.data.mca.MCACombineDataset
@@ -89,7 +91,7 @@ data:
         cell_features: /proj/aicell/data/stable-diffusion/mca/cell_features_necessary_columns.txt
         group: 'train' 
         use_cached_paths: True 
-        cached_paths: /proj/aicell/data/stable-diffusion/mca/train-90-data-mca.json   
+        cached_paths: /proj/aicell/data/stable-diffusion/mca/all-data-mca.json   
         normalization: True
         random_angle: True
     validation:
@@ -99,7 +101,7 @@ data:
         cell_features: /proj/aicell/data/stable-diffusion/mca/cell_features_necessary_columns.txt
         group: 'validation'
         use_cached_paths: True
-        cached_paths: /proj/aicell/data/stable-diffusion/mca/train-90-data-mca.json
+        cached_paths: /proj/aicell/data/stable-diffusion/mca/all-data-mca.json
         normalization: True
         random_angle: True
 
@@ -108,7 +110,7 @@ lightning:
     image_logger:
       target: ldm.callbacks.ImageLogger
       params:
-        batch_frequency: 50
+        batch_frequency: 1000
         max_images: 4
         increase_log_steps: false
         log_images_kwargs:
@@ -121,13 +123,15 @@ lightning:
           plot_inputs: true
           plot_reconstructions: true
           mix_sample: false
-          n_row: 1
+          n_row: 2
 
   trainer:
     benchmark: True
     accelerator: dp # need to change to dp because the default ddp will free the training
+    max_epochs: 5 # 1000 is default value for pl trainer
+    val_check_interval: 0.1
     # limit_val_batches: 100
     #fast_dev_run: True 
     #profiler: pytorch
-    limit_train_batches: 100
-    limit_val_batches: 1
+    #limit_train_batches: 100
+    #limit_val_batches: 1
