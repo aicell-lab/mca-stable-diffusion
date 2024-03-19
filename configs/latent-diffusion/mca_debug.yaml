@@ -1,19 +1,8 @@
 model:
-<<<<<<< HEAD
   base_learning_rate: 1 # learning rate with lr_scheduler #5.0e-5   # set to target_lr by starting main.py with '--scale_lr False'
   target: ldm.models.diffusion.ddpm.LatentDiffusion
   params:
     #ckpt_path: /proj/aicell/data/stable-diffusion/mca/logs/2024-03-14T15-56-18_mca_test/checkpoints/last.ckpt
-=======
-  base_learning_rate: 1 #5.0e-5   # set to target_lr by starting main.py with '--scale_lr False'
-  target: ldm.models.diffusion.ddpm.LatentDiffusion
-  params:
-<<<<<<< HEAD:configs/latent-diffusion/mca_test.yaml
-    #ckpt_path: /data/ethyni/stable-diffusion/logs/temp/ldm-berzelius.ckpt
-=======
-    ckpt_path: /proj/aicell/data/stable-diffusion/mca/logs/2024-03-14T15-56-18_mca_test/checkpoints/last.ckpt
->>>>>>> baf07e24c434e95072d0231de3a1e103c34241cb:configs/latent-diffusion/mca_debug.yaml
->>>>>>> 62a44cd480a1897326cb03c69061e3899805c0e2
     linear_start: 0.0015
     linear_end: 0.0155
     num_timesteps_cond: 1
@@ -34,20 +23,12 @@ model:
     scheduler_config: # 10000 warmup steps
        target: ldm.lr_scheduler.LambdaLinearScheduler
        params:
-<<<<<<< HEAD
          warm_up_steps: [1000, 1000, 1000, 1000, 1000, 1000, 1000]
          cycle_lengths: [9000, 9000, 9000, 9000, 9000, 9000, 9000]
-         f_start: [1.e-6, 1.e-6, 1.e-6, 1.e-6, 1.e-6, 1.e-6, 1.e-6]
-         f_max: [ 1.e-6 ]
-         f_min: [ 1.e-6 ]
-         verbosity_interval: 100
-=======
-         warm_up_steps: [500, 500, 500, 500, 500]
-         cycle_lengths: [1000, 1000, 1000, 1000, 100]
-         f_start: [5.e-6, 5.e-6, 5.e-6, 5.e-6, 5.e-6]
-         f_max: [ 1.e-5, 1.e-5, 1.e-5, 1.e-5, 1.e-5]
-         f_min: [ 1.e-6, 1.e-6, 1.e-6, 1.e-6, 1.e-6 ]
->>>>>>> 62a44cd480a1897326cb03c69061e3899805c0e2
+         f_start: [5.e-6, 5.e-6, 5.e-6, 5.e-6, 5.e-6, 5.e-6, 5.e-6]
+         f_max: [ 1.e-5, 1.e-5, 1.e-5, 1.e-5, 1.e-5, 1.e-5, 1.e-5 ]
+         f_min: [ 1.e-6, 1.e-6, 1.e-6, 1.e-6, 1.e-6, 1.e-6, 1.e-6 ]
+         verbosity_interval: 1000
 
     unet_config:
       target: ldm.modules.diffusionmodules.openaimodel.UNetModel
@@ -70,13 +51,8 @@ model:
       params:
         embed_dim: 3
         n_embed: 8192
-<<<<<<< HEAD:configs/latent-diffusion/mca_test.yaml
         # autoencoder for the reference + protein channel
-        #ckpt_path: /data/ethyni/stable-diffusion/logs/temp/autoencoder-berzelius.ckpt
-=======
-        # pretrained autoencoder
         ckpt_path: /proj/aicell/data/stable-diffusion/mca/logs/ae-keep-2024-03-11T16-16-14_autoencoder_vq_f4_mca_data/checkpoints/epoch=000001-v1.ckpt
->>>>>>> baf07e24c434e95072d0231de3a1e103c34241cb:configs/latent-diffusion/mca_debug.yaml
         ddconfig:
           double_z: false
           z_channels: 3
@@ -105,37 +81,12 @@ model:
 data:
   target: main.DataModuleFromConfig
   params:
-<<<<<<< HEAD
     batch_size: 8
     num_workers: 4 # disable multiprocessing
-=======
-<<<<<<< HEAD:configs/latent-diffusion/mca_test.yaml
-    batch_size: 4
-    # num_workers: 0 # disable multiprocessing
-=======
-    batch_size: 2
-    #num_workers: 16 # disable multiprocessing
->>>>>>> baf07e24c434e95072d0231de3a1e103c34241cb:configs/latent-diffusion/mca_debug.yaml
->>>>>>> 62a44cd480a1897326cb03c69061e3899805c0e2
     wrap: True # used to be True
     train:
       target: ldm.data.mca.MCACombineDataset
       params:
-<<<<<<< HEAD:configs/latent-diffusion/mca_test.yaml
-        directories: "/data/ethyni/mca/mitotic_cell_atlas_v1.0.1_exampledata/Data_tifs"
-        cell_features: "/data/ethyni/mca/cell_features_necessary_columns.txt"
-        group: 'train' 
-        use_cached_paths: true
-        cached_paths: /data/ethyni/stable-diffusion/ldm/data/europa-paths.json   
-    validation:
-      target: ldm.data.mca.MCACombineDataset
-      params:
-        directories: "/data/ethyni/mca/mitotic_cell_atlas_v1.0.1_exampledata/Data_tifs"
-        cell_features: "/data/ethyni/mca/cell_features_necessary_columns.txt"
-        group: 'validation'
-        use_cached_paths: true
-        cached_paths: /data/ethyni/stable-diffusion/ldm/data/europa-paths.json 
-=======
         directories: "/proj/aicell/data/stable-diffusion/mca/mitotic_cell_atlas_v1.0.1_fulldata/Data_tifs /proj/aicell/data/stable-diffusion/mca/ftp.ebi.ac.uk/pub/databases/IDR/idr0052-walther-condensinmap/20181113-ftp/MitoSys"
         cell_features: /proj/aicell/data/stable-diffusion/mca/cell_features_necessary_columns.txt
         group: 'train' 
@@ -153,23 +104,14 @@ data:
         cached_paths: /proj/aicell/data/stable-diffusion/mca/all-data-mca.json
         normalization: True
         random_angle: True
->>>>>>> baf07e24c434e95072d0231de3a1e103c34241cb:configs/latent-diffusion/mca_debug.yaml
 
 lightning:
   callbacks:
     image_logger:
       target: ldm.callbacks.ImageLogger
       params:
-<<<<<<< HEAD
         batch_frequency: 1000
-=======
-<<<<<<< HEAD:configs/latent-diffusion/mca_test.yaml
-        batch_frequency: 25
-=======
-        batch_frequency: 50
->>>>>>> baf07e24c434e95072d0231de3a1e103c34241cb:configs/latent-diffusion/mca_debug.yaml
->>>>>>> 62a44cd480a1897326cb03c69061e3899805c0e2
-        max_images: 4
+        max_images: 2
         increase_log_steps: false
         log_images_kwargs:
           ddim_steps: 100
@@ -178,11 +120,7 @@ lightning:
           plot_denoise_rows: true
           plot_progressive_rows: true
           plot_diffusion_rows: true
-<<<<<<< HEAD:configs/latent-diffusion/mca_test.yaml
-          plot_inputs: false
-=======
           plot_inputs: true
->>>>>>> baf07e24c434e95072d0231de3a1e103c34241cb:configs/latent-diffusion/mca_debug.yaml
           plot_reconstructions: true
           mix_sample: false
           n_row: 2
@@ -192,19 +130,9 @@ lightning:
     accelerator: dp # need to change to dp because the default ddp will free the training
     max_epochs: 5 # 1000 is default value for pl trainer
     val_check_interval: 0.1
-    # limit_val_batches: 100
     #fast_dev_run: True 
     #profiler: pytorch
-<<<<<<< HEAD
     #limit_train_batches: 100
     #limit_val_batches: 1
-=======
-    limit_train_batches: 100
-<<<<<<< HEAD:configs/latent-diffusion/mca_test.yaml
-    limit_val_batches: 1
-    #max_epoch: 1
-    resume_from_checkpoint: /data/ethyni/stable-diffusion/logs/temp/ldm-berzelius.ckpt
-=======
-    limit_val_batches: 1
->>>>>>> baf07e24c434e95072d0231de3a1e103c34241cb:configs/latent-diffusion/mca_debug.yaml
->>>>>>> 62a44cd480a1897326cb03c69061e3899805c0e2
+    #resume_from_checkpoint: /data/ethyni/stable-diffusion/logs/temp/ldm-berzelius.ckpt
+    
