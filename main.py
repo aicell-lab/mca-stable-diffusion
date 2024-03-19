@@ -183,18 +183,10 @@ def main(opt, logdir, nowname):
                  #"offline": False,
                  #"mode": "online", # changed from offline to mode which can be online/offline
                  #"id": nowname,
-<<<<<<< HEAD
-                 #"id": "cytnqlfv",
-                 "id": "test-es",
-                 "project": "test-embedding",
-                 #"config": config_to_log, # gives unexpected error, TypeError unless dict is empty
-                 "resume": "allow"
-=======
                  #"id": "scilifelab-ddls/train-autoencoder-mca/wtcurq79",
                  "project": "train-autoencoder-mca",
                  #"config": config_to_log, # gives unexpected error, TypeError unless dict is empty
                  #"resume": "must"
->>>>>>> baf07e24c434e95072d0231de3a1e103c34241cb
                  # must link to wandb somehow as anonymous is set to never (default)
             }
         #},
