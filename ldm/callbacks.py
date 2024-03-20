@@ -332,16 +332,27 @@ class CPUMemoryMonitor(Callback):
 
 class CustomEarlyStopping(EarlyStopping):
     """Custom early stopping to check more often than after every epoch or after validation"""
-    def __init__(self, *args, check_frequency_gs, **kwargs):
+    def __init__(self, *args, check_frequency_gs, start_check_from_gs=0, no_val=True,
+                  save_callback_in_ckpt=False, **kwargs):
         super().__init__(*args, **kwargs)
-        self.check_frequency_gs = check_frequency_gs
+        self.check_frequency_gs = check_frequency_gs 
+        self.start_check_from_gs = start_check_from_gs
+        self.no_val = no_val
+        self.save_callback_in_ckpt = save_callback_in_ckpt
 
     def on_validation_end(self, trainer, pl_module) -> None:
         pass
 
     def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx):
-        if (pl_module.global_step % self.check_frequency_gs == 0) and pl_module.global_step != 0:
+        if (pl_module.global_step % self.check_frequency_gs == 0) and (pl_module.global_step > self.start_check_from_gs) :
             print('Checking early stop at global step', pl_module.global_step)
             self._run_early_stopping_check(trainer)
             if trainer.should_stop is True:
-                trainer.limit_val_batches = 0
+                if self.no_val:
+                    trainer.limit_val_batches = 0 # avoid running validation after stop signal to trainer
+                if not self.save_callback_in_ckpt:
+                    for i in range(len(trainer.callbacks)): 
+                        if trainer.callbacks[i] == self:
+                            trainer.callbacks.pop(i) # remove early stopping callback to be able to change the settings for next run if using trainer.resume_from_checkpoint
+                            break
+                
