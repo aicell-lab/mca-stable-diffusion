@@ -182,10 +182,10 @@ def main(opt, logdir, nowname):
                  #"offline": False,
                  #"mode": "online", # changed from offline to mode which can be online/offline
                  #"id": nowname,
-                 #"id": "testing-early-stop4",
+                 "id": "ht4epnn7",
                  "project": "test-embedding",
                  #"config": config_to_log, # gives unexpected error, TypeError unless dict is empty
-                 "resume": "allow"
+                 "resume": "must"
                  # must link to wandb somehow as anonymous is set to never (default)
             }
         #},
@@ -253,13 +253,13 @@ def main(opt, logdir, nowname):
                 "clamp": True
             }
         },
-        #"learning_rate_logger": {
-        #    "target": "pytorch_lightning.callbacks.LearningRateMonitor",
-        #    "params": {
-        #        "logging_interval": "step",
-        #        # "log_momentum": True
-        #    }
-        #},
+        "learning_rate_logger": {
+            "target": "pytorch_lightning.callbacks.LearningRateMonitor",
+            "params": {
+                "logging_interval": "step",
+                # "log_momentum": True
+            }
+        },
         "cuda_callback": {
             "target": "ldm.callbacks.CUDACallback"
         },
@@ -272,12 +272,12 @@ def main(opt, logdir, nowname):
             #"monitor": "val/loss_simple_ema", 
             "monitor": "train/loss_step",
             "mode": "min", 
-            "patience": 10,
-            "min_delta": 0.0, 
-            "divergence_threshold": 0.6, 
+            "patience": 5,
+            "min_delta": 0.01, 
+            #"divergence_threshold": 0.6, 
             "check_on_train_epoch_end": False, # run early stopping at the end of validation
             "verbose": True,
-            "check_frequency_gs": 500}
+            "check_frequency_gs": 10}
         }
     }
     if version.parse(pl.__version__) >= version.parse('1.4.0'):
