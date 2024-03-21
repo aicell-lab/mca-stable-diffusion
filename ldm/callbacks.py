@@ -153,11 +153,9 @@ class ImageLogger(Callback):
                 pl_module.eval()
 
             with torch.no_grad():
-                images, targets, samples = pl_module.gen_images(batch, split=split, **self.log_images_kwargs)
+                images, targets, samples = pl_module.gen_images(batch, split=split, N=self.max_images, **self.log_images_kwargs)
 
             for k in images:
-                N = min(images[k].shape[0], self.max_images)
-                images[k] = images[k][:N]
                 if isinstance(images[k], torch.Tensor):
                     images[k] = images[k].detach().cpu()
                     if self.clamp:
