@@ -66,8 +66,8 @@ def main(opt):
     
     # Load the model checkpoint
     model = instantiate_from_config(config.model)
-    model.load_state_dict(torch.load(opt.checkpoint, map_location="cpu")["state_dict"],
-                          strict=False)
+    if opt.checkpoint != '':
+        model.load_state_dict(torch.load(opt.checkpoint, map_location="cpu")["state_dict"],strict=False)
 
     os.environ["CUDA_VISIBLE_DEVICES"] = opt.gpu
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")

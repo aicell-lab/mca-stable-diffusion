@@ -20,15 +20,15 @@ model:
     scale_by_std: true
     monitor: 'val/loss_simple_ema'
 
-    scheduler_config: # 10000 warmup steps
+    scheduler_config: 
        target: ldm.lr_scheduler.LambdaLinearScheduler
        params:
-         warm_up_steps: [1000, 1000, 1000, 1000, 1000, 1000, 1000]
-         cycle_lengths: [9000, 9000, 9000, 9000, 9000, 9000, 9000]
-         f_start: [5.e-6, 5.e-6, 5.e-6, 5.e-6, 5.e-6, 5.e-6, 5.e-6]
-         f_max: [ 1.e-5, 1.e-5, 1.e-5, 1.e-5, 1.e-5, 1.e-5, 1.e-5 ]
-         f_min: [ 1.e-6, 1.e-6, 1.e-6, 1.e-6, 1.e-6, 1.e-6, 1.e-6 ]
-         verbosity_interval: 1000
+         warm_up_steps: [1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1]
+         cycle_lengths: [9000, 9000, 9000, 9000, 9000, 9000, 9000, 9000, 9000, 9000, 1000000000000]
+         f_start: [5.e-6, 5.e-6, 5.e-6, 5.e-6, 5.e-6, 5.e-6, 5.e-6, 5.e-6, 5.e-6, 5.e-6, 1.e-6]
+         f_max: [ 5.e-5, 5.e-5, 5.e-5, 5.e-5, 5.e-5, 5.e-5, 5.e-5, 5.e-5, 5.e-5, 5.e-5, 1.e-6]
+         f_min: [ 1.e-6, 1.e-6, 1.e-6, 1.e-6, 1.e-6, 1.e-6, 1.e-6, 1.e-6, 1.e-6, 1.e-6, 1.e-6]
+         #verbosity_interval: 10000
 
     unet_config:
       target: ldm.modules.diffusionmodules.openaimodel.UNetModel
@@ -82,7 +82,7 @@ data:
   target: main.DataModuleFromConfig
   params:
     batch_size: 8
-    num_workers: 4 # disable multiprocessing
+    num_workers: 8 # disable multiprocessing
     wrap: True # used to be True
     train:
       target: ldm.data.mca.MCACombineDataset
@@ -110,8 +110,8 @@ lightning:
     image_logger:
       target: ldm.callbacks.ImageLogger
       params:
-        batch_frequency: 1000
-        max_images: 2
+        batch_frequency: 5000
+        max_images: 3
         increase_log_steps: false
         log_images_kwargs:
           ddim_steps: 100
@@ -123,12 +123,12 @@ lightning:
           plot_inputs: true
           plot_reconstructions: true
           mix_sample: false
-          n_row: 2
+          n_row: 4
 
   trainer:
     benchmark: True
     accelerator: dp # need to change to dp because the default ddp will free the training
-    max_epochs: 5 # 1000 is default value for pl trainer
+    max_epochs: 3 # 1000 is default value for pl trainer
     val_check_interval: 0.1
     #fast_dev_run: True 
     #profiler: pytorch
