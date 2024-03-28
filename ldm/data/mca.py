@@ -65,11 +65,12 @@ class MCACombineDataset(Dataset):
         # split into train and val based on train_val_split
         assert train_val_split > 0 and train_val_split <= 1
         assert group in ['train', 'validation'] 
-        split = int(len(self.img_paths) * train_val_split)
-        if group == 'train':
-            self.img_paths = self.img_paths[:split]
-        else: 
-            self.img_paths = self.img_paths[split:]
+        if train_val_split < 1:
+            split = int(len(self.img_paths) * train_val_split)
+            if group == 'train':
+                self.img_paths = self.img_paths[:split]
+            else: 
+                self.img_paths = self.img_paths[split:]
     
         # get all cell features 
         self.cell_features = pd.read_csv(cell_features, sep='\s+')
