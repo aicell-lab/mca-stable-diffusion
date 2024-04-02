@@ -222,7 +222,8 @@ class MCALabelEmbedder(nn.Module):
         embedding = self.label_embedder.to(batch.device)
         if batch.shape[-1] == 1:
             batch = torch.reshape(batch, (batch.shape[0], batch.shape[1]))
-        return embedding(batch)
+        cond = {'c_crossattn': [embedding(batch)]} 
+        return cond
 
 
 
