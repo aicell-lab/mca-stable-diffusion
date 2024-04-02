@@ -104,7 +104,7 @@ class DataModuleFromConfig(pl.LightningDataModule):
                           shuffle=shuffle, persistent_workers=self.num_workers > 0, pin_memory=True) 
 
     def _test_dataloader(self, shuffle=False):
-        is_iterable_dataset = isinstance(self.datasets['train'], Txt2ImgIterableBaseDataset)
+        is_iterable_dataset = isinstance(self.datasets['test'], Txt2ImgIterableBaseDataset)
         if is_iterable_dataset or self.use_worker_init_fn:
             init_fn = worker_init_fn
         else:
@@ -181,11 +181,11 @@ def main(opt, logdir, nowname):
                 # "offline": opt.debug,
                  #"offline": False,
                  #"mode": "online", # changed from offline to mode which can be online/offline
-                 "id": nowname,
-                 #"id": "ht4epnn7",
+                 #"id": nowname,
+                 "id": "2024-04-02T11-34-54_mca_debug",
                  "project": "ldm-training-128-128",
                  #"config": config_to_log, # gives unexpected error, TypeError unless dict is empty
-                 "resume": "allow"
+                 "resume": "must"
                  # must link to wandb somehow as anonymous is set to never (default)
             }
         #},
