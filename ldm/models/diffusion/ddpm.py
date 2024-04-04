@@ -687,6 +687,8 @@ class LatentDiffusion(DDPM):
                     xc = batch
                 elif cond_key == 'hybrid-conditions':
                     xc = batch
+                elif cond_key == 'labels_and_mask':
+                    xc = {'labels': batch['labels'], 'mask': batch['mask']}
                 
                 else:
                     xc = super().get_input(batch, cond_key).to(self.device)
