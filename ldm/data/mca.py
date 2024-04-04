@@ -14,6 +14,7 @@ import json
 import time
 import torch.nn as nn
 import torch
+from ldm.util import instantiate_from_config
 
 # all available proteins from v1.0.1 and v1.1
 protein_dict = {'APC2': 0, 'AURKB': 1, 'BUB1': 2, 'BUBR1': 3, 
@@ -25,12 +26,15 @@ protein_dict = {'APC2': 0, 'AURKB': 1, 'BUB1': 2, 'BUBR1': 3,
                 'TOP2A': 24, 'TPR': 25, 'TUBB2C': 26, 'WAPL': 27,
                 'NCAPH': 28, 'NCAPD2': 29, 'NCAPD3': 30, 'SMC4': 31 } 
 
+# number of stages, stack indices and proteins in the dataset
+size_dict = {0: 20, 1: 31, 2: len(protein_dict)} 
+
         
 class MCACombineDataset(Dataset):
     """Dataset class for the mitotic cell atlas raw images"""
     def __init__(self, directories, cell_features, use_cached_paths=True, cached_paths='', group='train', z_stacks=31, seed=123, train_val_split=0.95, image_path='*/*/rawtif/*.tif',
                  random_angle=False, rotation_mode='reflect', normalization=False, percentiles=(1, 99), add_noise=False,
-                 noise_type = 'gaussian'):
+                 noise_type = 'gaussian', cell_regex = None, return_masks=False, *args, **kwargs):
         """Input:
         directories: paths to all relevant directories with the experiment folders. Multiple paths should be separated by any whitespace character
         cell_features: path to cell_features_necessary_columns.txt
@@ -46,7 +50,7 @@ class MCACombineDataset(Dataset):
         noise_type: str with the noise type. Currently Gaussian noise is the only implemented type which adds gaussian with zero mean and std(channel) separately to the images
         data_to_use: float for deciding how large dataset you want to use. Used for development purposes to reduce dataset size easily
         whilst still accessing all the data"""
-        #t=time.time()
+
         super().__init__()
         
         if use_cached_paths:
@@ -74,6 +78,7 @@ class MCACombineDataset(Dataset):
     
         # get all cell features 
         self.cell_features = pd.read_csv(cell_features, sep='\s+')
+        self.cell_regex = "(\d{6}_[A-Za-z0-9-]+_[A-Za-z12]+\/cell\d+_R\d+)" if cell_regex is None else cell_regex
         self.z_stacks = z_stacks
         self.random_angle = random_angle
         self.rotation_mode = rotation_mode if self.random_angle else None
@@ -81,7 +86,7 @@ class MCACombineDataset(Dataset):
         self.percentiles = percentiles if self.normalization else None
         self.add_noise = add_noise
         self.noise_type = noise_type if self.add_noise else None
-        #self.init_time = time.time() - t
+        self.return_masks = return_masks
 
     
     def _get_cell_stage_from_path(self, img_path, regex="(\d{6}_[A-Za-z0-9-]+_[A-Za-z12]+\/cell\d+_R\d+)"):
@@ -108,7 +113,7 @@ class MCACombineDataset(Dataset):
 
     def _extract_labels(self, img_path):
         """For extract labels from cell_features from img_path"""
-        stage, poi = self._get_cell_stage_from_path(img_path)
+        stage, poi = self._get_cell_stage_from_path(img_path, regex=self.cell_regex)
         poi = protein_dict[poi] # turn str to int
         return stage, poi
     
@@ -182,48 +187,115 @@ class MCACombineDataset(Dataset):
         image = np.stack((cell, poi_img, nuc), axis=2)
 
 
-        # get labels 0: cell stage, 1: stack_idx, 2-30 poi according to protein_dict
+        # get labels 0: cell stage, 1: stack_idx, 2-33 poi according to protein_dict
         stage, poi = self._extract_labels(img_path) # integers now
-        #labels = (stage, stack_idx, poi)
+        labels = np.array([stage-1, stack_idx, poi]) # now all labels starts with zero to mark the first
         # one hot encoding + rescaling to 0-1 for labels
-        stage = stage/20 # rescale from 1 - 20 to ~0 and 1
-        stack_idx = stack_idx/(self.z_stacks-1) # rescale from 0 to 30 to 0 and 1
-        labels = np.zeros((2 + len(protein_dict), 1), dtype=np.float32)
-        labels[0], labels[1] = stage, stack_idx
-        labels[poi+2] = 1 # one hot encoding  
+        #stage = stage/20 # rescale from 1 - 20 to ~0 and 1
+        #stack_idx = stack_idx/(self.z_stacks-1) # rescale from 0 to 30 to 0 and 1
+        #poi = poi/len(protein_dict.keys()) # rescale from 0 to 31 to 0 and 1
+        #labels = np.zeros((2 + len(protein_dict), 1), dtype=np.float32)
+        #labels[0], labels[1] = stage, stack_idx
+        #labels[poi+2] = 1 # one hot encoding  
+        del poi_img, nuc, cell
+
+        if self.return_masks:
+            mask_path = img_path.replace('rawtif', 'masktif')
+            mask = AICSImage(mask_path, reader=TiffReader)
+            cell = mask.get_image_data('XY', C=0, T=0, Z=stack_idx + self.z_stacks) # has zeros and ones
+            #nuclei = (mask.get_image_data('XY', C=0, T=0, Z=stack_idx)/2) # has zeros and twos, only use cell volume as reference
+            nuclei = np.zeros_like(cell)
+            poi_channel = np.zeros_like(cell)
+            mask = np.stack((cell, poi_channel, nuclei), axis=2).astype(np.float32) # same channel order as raw images
+            del cell, nuclei, poi_channel
+            #take image from 0 to 1 to -1, 1 as rawimages
+            mask = 2 * mask - 1
+            return {'image':self.preprocess_image(image), 'labels': labels, 'mask': mask}
+        else:
+            return {'image':self.preprocess_image(image), 'labels': labels} 
         
-        return {'image':self.preprocess_image(image), 'labels': labels} 
-        
-    
-    # if it is easier with the generator, then could rename current getitem to a function func and uncomment this
-    #def _sample_generator(self):
-    #    for i in range(len(self)):
-    #        yield func[i]
-    
-    #def __getitem__(self):
-    #    return next(self.sample_generator)
+  
 
-
-
-class MCALabelEmbedder(nn.Module):
+class MCAConditionEmbedder(nn.Module):
     
-    def __init__(self, layer_1_size, output_size_context_dim, *args, **kwargs) -> None:
+    def __init__(self, output_size_context_dim=128, hidden_layers = [128], one_hot_all_labels = False, concat_mode=False, image_embedding_model="", *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.label_embedder = nn.Sequential(
-                nn.Linear(len(protein_dict.keys()) + 2, layer_1_size),
-                nn.ReLU(),
-                nn.Linear(layer_1_size, output_size_context_dim),
-            )
+        """
+        MCA Label Embedder for the LatentDiffusion Model
+        Input: 
+        output_size_context_dim: the size of the sequential network output. Must match the context_dim of the LatentDiffusion Model
+        hidden_layers: sizes of the hidden layers in the label embedding model. ReLu is used as activation function between layers
+        one_hot_all_labels: if True one hot encode all labels, if False one hot encode only the protein label (relevant for label embedding)
+        concat_mode: if True concatenate the image embedding with the raw images in latent space
+        image_embedding_model: if concat_mode is True, pass the image embedding model to downsample the mask for latent space to use with LDM hybrid conditioning mode
+
+        """
+
+        self.one_hot_all_labels = one_hot_all_labels
+        self.concat_mode = concat_mode
+        
+        # load the pretrainer autoencoder as mask embedding model
+        if image_embedding_model and self.concat_mode:
+            assert not isinstance(image_embedding_model, dict)
+            self.image_embedding_model = instantiate_from_config(image_embedding_model)
+            self.image_embedding_model_exists = True
+        else:
+            self.image_embedding_model_exists = False
+        
+        # prepare the label embedding model
+        layers = []
+        if one_hot_all_labels:
+            in_features = np.sum(list(size_dict.values()))
+        else:
+            in_features = 2 + len(protein_dict) # only one hot encode the protein label
+        for hidden_layer_size in hidden_layers:
+            layers.append(nn.Linear(in_features, hidden_layer_size))
+            layers.append(nn.ReLU())
+            in_features = hidden_layer_size
+        layers.append(nn.Linear(in_features, output_size_context_dim))
+        self.label_embedding_model = nn.Sequential(*layers)
+        
+       
+        
+    def forward(self, batch):
+        if type(batch) == dict and "labels" in batch.keys(): 
+            labels = batch["labels"]
+        else:
+            labels = batch
+        if self.one_hot_all_labels:
+            one_hot = []
+            for i in range(labels.shape[1]):
+                one_hot.append(self.one_hot(labels[:, i], i))
+            labels = torch.cat(one_hot, 1).to(labels.device)
+            del one_hot
+        
+        else:
+            new_labels = torch.zeros(labels.shape[0], len(protein_dict.keys())+ 2)
+            new_labels[:, labels[:, 2]+ 2] = 1
+            new_labels[:, 0] = labels[:, 0]/size_dict[0] # rescale from 0 to 19 to [0, 1)
+            new_labels[:, 1] = labels[:, 1]/size_dict[1] # rescale from 0 to 30 to [0,1)
+            labels = new_labels.to(labels.device)
+            del new_labels
+
+        # label embedding
+        label_embedding = self.label_embedding_model.to(labels.device)
+        cond = {'c_crossattn': [label_embedding(labels)]} 
+
+        # image embedding
+        if self.concat_mode and type(batch) == dict and 'mask' in batch.keys() and self.image_embedding_model_exists:
+            batch['mask'] = torch.permute(batch['mask'], (0, 3, 1, 2))
+            cond['c_concat'] = [ self.image_embedding_model.encode(batch['mask']) ]
+
+        return cond
     
 
-    def forward(self, batch, key='labels'):
-        if type(batch) == dict: # only use the labels for the conditioning in image logger
-            batch = batch[key]
-        embedding = self.label_embedder.to(batch.device)
-        if batch.shape[-1] == 1:
-            batch = torch.reshape(batch, (batch.shape[0], batch.shape[1]))
-        cond = {'c_crossattn': [embedding(batch)]} 
-        return cond
+    def one_hot(self, label, label_type):
+        """One hot encode the label"""
+        # stage 0:19, stack_idx 0:30, poi 0:31
+        one_hot = torch.zeros(label.shape[0], size_dict[label_type]).to(label.device)
+        for i in range(label.shape[0]):
+            one_hot[i, label[i]] = 1
+        return one_hot
 
 
 
@@ -240,6 +312,7 @@ def test_dataloader(dataset):
 def create_cached_paths():
     dirs = "/proj/aicell/data/stable-diffusion/mca/ftp.ebi.ac.uk/pub/databases/IDR/idr0052-walther-condensinmap/20181113-ftp/MitoSys /proj/aicell/data/stable-diffusion/mca/mitotic_cell_atlas_v1.0.1_fulldata/Data_tifs"
     image_path='*/*/rawtif/*.tif'
+
     seed=23
     dirs = dirs.split()
     img_paths = []
@@ -273,12 +346,16 @@ def main():
     
     dirs = "/proj/aicell/data/stable-diffusion/mca/ftp.ebi.ac.uk/pub/databases/IDR/idr0052-walther-condensinmap/20181113-ftp/MitoSys /proj/aicell/data/stable-diffusion/mca/mitotic_cell_atlas_v1.0.1_fulldata/Data_tifs"
     cf_path = "/proj/aicell/data/stable-diffusion/mca/cell_features_necessary_columns.txt"
-    #train = MCACombineDataset(dirs, cf_path, 'train', z_stacks=31,
-    #                          add_noise=False, normalization=True, random_angle=True, image_path='*/*/rawtif/*.tif', 
-    #                          train_val_split=1)
-    
+
+    dirs = "/data/ethyni/mca/mitotic_cell_atlas_v1.0.1_exampledata/Data_tifs"
+    cf_path="/data/ethyni/mca/cell_features_necessary_columns.txt"
+    train = MCACombineDataset(dirs, cf_path, group='train', z_stacks=31,
+                              add_noise=False, normalization=True, random_angle=True, image_path='*/*/rawtif/*.tif', 
+                              train_val_split=1, use_cached_paths=False, return_masks=True)
+   
+    train[4]
     # create cache files
-    create_cached_paths()
+    #create_cached_paths()
     exit()
 
     # test time if cache is faster or not
