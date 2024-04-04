@@ -181,11 +181,17 @@ def main(opt, logdir, nowname):
                 # "offline": opt.debug,
                  #"offline": False,
                  #"mode": "online", # changed from offline to mode which can be online/offline
+<<<<<<< HEAD
                  "id": nowname,
                  #"id": "ht4epnn7",
                  "project": "autoencoder-test-set-metrics",
+=======
+                 #"id": nowname,
+                 "id": "2024-04-02T11-34-54_mca_debug",
+                 "project": "ldm-training-128-128",
+>>>>>>> 4aff0b8e1d75112d4cbda8df60658ecf4b172dbf
                  #"config": config_to_log, # gives unexpected error, TypeError unless dict is empty
-                 "resume": "allow"
+                 "resume": "must"
                  # must link to wandb somehow as anonymous is set to never (default)
             }
         #},
