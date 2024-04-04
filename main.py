@@ -104,7 +104,7 @@ class DataModuleFromConfig(pl.LightningDataModule):
                           shuffle=shuffle, persistent_workers=self.num_workers > 0, pin_memory=True) 
 
     def _test_dataloader(self, shuffle=False):
-        is_iterable_dataset = isinstance(self.datasets['train'], Txt2ImgIterableBaseDataset)
+        is_iterable_dataset = isinstance(self.datasets['test'], Txt2ImgIterableBaseDataset)
         if is_iterable_dataset or self.use_worker_init_fn:
             init_fn = worker_init_fn
         else:
@@ -183,7 +183,7 @@ def main(opt, logdir, nowname):
                  #"mode": "online", # changed from offline to mode which can be online/offline
                  "id": nowname,
                  #"id": "ht4epnn7",
-                 "project": "ldm-training-128-128",
+                 "project": "autoencoder-test-set-metrics",
                  #"config": config_to_log, # gives unexpected error, TypeError unless dict is empty
                  "resume": "allow"
                  # must link to wandb somehow as anonymous is set to never (default)
@@ -387,7 +387,20 @@ def main(opt, logdir, nowname):
                 send_message_to_slack("Oops, the diffusion model training process has stopped unexpectedly")
             raise
     if not opt.no_test and not trainer.interrupted:
-        trainer.test(model, data)
+        ret = trainer.test(model, data, verbose=True)
+        print(ret)
+    
+    if opt.use_lr_finder and not opt.train and opt.no_test: # only run lr finder
+        try:
+            lr_finder = trainer.tuner.lr_find(model, data, min_lr=1.0e-8, max_lr=1.0e-2, num_training=5000)
+            suggested_lr = lr_finder.suggestion()
+            print(f"Suggested learning rate: {suggested_lr}")
+            fig = lr_finder.plot(suggest=True)
+            fig.savefig(os.path.join(logdir, "lr_finder.png"))
+        except Exception as e:
+            print(f"LR finder failed: {e}")
+        
+        
     # except Exception:
     #     if opt.debug and trainer.global_rank == 0:
     #         try:

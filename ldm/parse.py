@@ -104,6 +104,14 @@ def get_parser(**parser_kwargs):
         default=True,
         help="scale base-lr by ngpu * batch_size * n_accumulate",
     )
+    parser.add_argument(
+        "--use_lr_finder",
+        type=str2bool,
+        nargs="?",
+        const=False,
+        default=False,
+        help="If true use the pl lr_finder to find best lr"
+    )
     return parser
 
 
