@@ -258,6 +258,9 @@ class MCAConditionEmbedder(nn.Module):
        
         
     def forward(self, batch):
+        """
+        Forward pass for the label embedding model and the image embedding model if concat_mode is True
+        """
         if type(batch) == dict and "labels" in batch.keys(): 
             labels = batch["labels"]
         else:
