@@ -233,6 +233,28 @@ class VQModel(pl.LightningModule):
 
     def get_last_layer(self):
         return self.decoder.conv_out.weight
+    
+    def test_step(self, batch, batch_idx):
+        x = self.get_input(batch, self.image_key)
+        xrec, qloss, ind = self(x, return_pred_indices=True)
+        opt_idx = 0
+
+        if opt_idx == 0:
+            # autoencode
+            aeloss, log_dict_ae = self.loss(qloss, x, xrec, 0, self.global_step,
+                                            last_layer=self.get_last_layer(), split="test",
+                                            predicted_indices=ind)
+
+            self.log_dict(log_dict_ae, prog_bar=False, logger=True, on_step=True, on_epoch=True)
+            return aeloss
+
+        if opt_idx == 1:
+            # discriminator
+            discloss, log_dict_disc = self.loss(qloss, x, xrec, 1, self.global_step,
+                                            last_layer=self.get_last_layer(), split="test")
+            self.log_dict(log_dict_disc, prog_bar=False, logger=True, on_step=True, on_epoch=True)
+            return discloss
+
 
     @torch.no_grad()
     def log_images(self, batch, only_inputs=False, plot_ema=False, **kwargs):
