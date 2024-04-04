@@ -253,7 +253,7 @@ class MCAConditionEmbedder(nn.Module):
             layers.append(nn.ReLU())
             in_features = hidden_layer_size
         layers.append(nn.Linear(in_features, output_size_context_dim))
-        self.label_embedding_model = nn.Sequential(*layers)
+        self.label_embedder = nn.Sequential(*layers)
         
        
         
@@ -281,7 +281,7 @@ class MCAConditionEmbedder(nn.Module):
             del new_labels
 
         # label embedding
-        label_embedding = self.label_embedding_model.to(labels.device)
+        label_embedding = self.label_embedder.to(labels.device)
         cond = {'c_crossattn': [label_embedding(labels)]} 
 
         # image embedding
