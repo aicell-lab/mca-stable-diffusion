@@ -34,22 +34,26 @@ class MCACombineDataset(Dataset):
     """Dataset class for the mitotic cell atlas raw images"""
     def __init__(self, directories, cell_features, use_cached_paths=True, cached_paths='', group='train', z_stacks=31, seed=123, train_val_split=0.95, image_path='*/*/rawtif/*.tif',
                  random_angle=False, rotation_mode='reflect', normalization=False, percentiles=(1, 99), add_noise=False,
-                 noise_type = 'gaussian', cell_regex = None, return_masks=False, *args, **kwargs):
+                 noise_type = 'gaussian', cell_regex = None, return_masks=False, skip_top_bottom=0, *args, **kwargs):
         """Input:
         directories: paths to all relevant directories with the experiment folders. Multiple paths should be separated by any whitespace character
         cell_features: path to cell_features_necessary_columns.txt
         seed and train_val_split to split the dataset into train and val
         image_paths: relative glob style path from directories path to the .tif files
-        
-        Extra things:
+        use_cached_paths: if True use the cached paths to save some time when loading the dataset
+        cached_paths: path to the cached paths
+        group: 'train' or 'validation' to split the dataset
+        z_stacks: number of z-stacks in the images for the channels
         random_angle: if True apply random angle transformation to images
         rotation_mode: mode for scimage.transform.rotate if random_angle
         normalization: if True apply percentile normalization to images for each channel separately
         percentiles: tuple with percentiles to use for normalization if normalization
         add_noise: if True add noise to the images
         noise_type: str with the noise type. Currently Gaussian noise is the only implemented type which adds gaussian with zero mean and std(channel) separately to the images
-        data_to_use: float for deciding how large dataset you want to use. Used for development purposes to reduce dataset size easily
-        whilst still accessing all the data"""
+        cell_regex: regex to match the path column in cell_features.txt
+        return_masks: if True return the masks as well. Mask is currently only used with the cell volume mask
+        skip_top_bottom: number of top and bottom slices to skip in the z-stack
+        """
 
         super().__init__()
         
@@ -77,6 +81,7 @@ class MCACombineDataset(Dataset):
                 self.img_paths = self.img_paths[split:]
     
         # get all cell features 
+        assert type(skip_top_bottom) == int and type(z_stacks) == int
         self.cell_features = pd.read_csv(cell_features, sep='\s+')
         self.cell_regex = "(\d{6}_[A-Za-z0-9-]+_[A-Za-z12]+\/cell\d+_R\d+)" if cell_regex is None else cell_regex
         self.z_stacks = z_stacks
@@ -87,6 +92,8 @@ class MCACombineDataset(Dataset):
         self.add_noise = add_noise
         self.noise_type = noise_type if self.add_noise else None
         self.return_masks = return_masks
+        assert skip_top_bottom >= 0 and skip_top_bottom < self.z_stacks/2, 'skip_top_bottom must be between 0 and z_stacks/2'
+        self.skip_top_bottom = skip_top_bottom
 
     
     def _get_cell_stage_from_path(self, img_path, regex="(\d{6}_[A-Za-z0-9-]+_[A-Za-z12]+\/cell\d+_R\d+)"):
@@ -167,12 +174,15 @@ class MCACombineDataset(Dataset):
 
 
     def __len__(self):
-        return len(self.img_paths) * self.z_stacks
+        if self.skip_top_bottom > 0:
+            return len(self.img_paths) * (self.z_stacks - 2 * self.skip_top_bottom)
+        else:
+            return len(self.img_paths) * self.z_stacks
     
 
     def __getitem__(self, idx):
-        image_idx = idx // self.z_stacks
-        stack_idx = idx % self.z_stacks
+        image_idx = idx // self.z_stacks if self.skip_top_bottom == 0 else idx // (self.z_stacks - 2 * self.skip_top_bottom)
+        stack_idx = idx % self.z_stacks if self.skip_top_bottom == 0 else idx % (self.z_stacks - 2 * self.skip_top_bottom) + self.skip_top_bottom
         img_path = self.img_paths[image_idx]
         image = AICSImage(img_path, reader=TiffReader)
         #image = image.get_image_dask_data('ZYX')
@@ -354,9 +364,10 @@ def main():
     cf_path="/data/ethyni/mca/cell_features_necessary_columns.txt"
     train = MCACombineDataset(dirs, cf_path, group='train', z_stacks=31,
                               add_noise=False, normalization=True, random_angle=True, image_path='*/*/rawtif/*.tif', 
-                              train_val_split=1, use_cached_paths=False, return_masks=True)
-   
-    train[4]
+                              train_val_split=1, use_cached_paths=False, return_masks=True, skip_top_bottom=3)
+    print(len(train))
+    for i in range(len(train)):
+        train[i]
     # create cache files
     #create_cached_paths()
     exit()
