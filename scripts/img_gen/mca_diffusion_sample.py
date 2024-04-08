@@ -41,7 +41,7 @@ def condtions_to_text(c):
 
 
 def main(opt):
-    # now = datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
+    now = datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
     split = "test"
     if opt.name:
         name = opt.name
@@ -76,6 +76,14 @@ def main(opt):
 
     os.makedirs(opt.outdir, exist_ok=True)
 
+    T = torchvision.transforms.ToPILImage() 
+
+    if opt.save_images:
+        gt_folder = os.path.join(opt.outdir,"ground_truth")
+        pred_folder = os.path.join(opt.outdir, "predicted")
+        os.makedirs(gt_folder, exist_ok=True)
+        os.makedirs(pred_folder, exist_ok=True)
+
     total_count = len(data.datasets[split])
      
     predicted_images, gt_images = [], []
@@ -87,7 +95,7 @@ def main(opt):
                 if i % opt.skip_images != 0:
                     continue
                 sample = {k: torch.from_numpy(np.expand_dims(sample[k], axis=0)).to(device) if isinstance(sample[k], (np.ndarray, np.generic)) else sample[k] for k in sample.keys()}
-                name = f"{k}_image{i}"
+                name = f"{k}_image{i}_{now}"
                 outpath = os.path.join(opt.outdir, name)
 
                 c = model.cond_stage_model(sample)
@@ -119,9 +127,16 @@ def main(opt):
                 gt_images.append(gt_image)
                 filenames.append(name)
 
+                if opt.save_images: 
+                    img = T(predicted_image)                   
+                    img.save(os.path.join(pred_folder, filenames[i] + "-pred.png"))
+                    img = T(gt_image)
+                    img.save(os.path.join(gt_folder, filenames[i] + "-gt.png"))
+
+
     n_images_to_plot = min(8, len(predicted_images))
     fig, axes = plt.subplots(n_images_to_plot, 2, figsize=(10,10)) 
-    T = torchvision.transforms.ToPILImage()  
+     
     if opt.pil:
         # pred_captions = [f"Predicted, MSE: {mse_list[i]:.2g}, SSIM: {ssim_list[i]:.2g}" for i in range(len(predicted_images))]
         for i in range(n_images_to_plot):
@@ -162,19 +177,7 @@ def main(opt):
     fig.savefig(os.path.join(opt.outdir, f'predicted-image-grid-s{opt.scale}.png'))
     fig.tight_layout()
 
-    if opt.save_images:
-        predicted_images = [T(x) for x in predicted_images]
-        gt_images = [T(x) for x in gt_images]
-        #os.makedirs(os.path.join(opt.outdir, "gen_images"), exist_ok=True)
-        
-        gt_folder = os.path.join(opt.outdir,"ground_truth")
-        pred_folder = os.path.join(opt.outdir, "predicted")
-        os.makedirs(gt_folder, exist_ok=True)
-        os.makedirs(pred_folder, exist_ok=True)
-
-        for i, img in enumerate(predicted_images):
-            img.save(os.path.join(pred_folder, filenames[i] + ".png"))
-            gt_images[i].save(os.path.join(gt_folder, filenames[i] + ".png"))
+    
 
 
 if __name__ == "__main__":
