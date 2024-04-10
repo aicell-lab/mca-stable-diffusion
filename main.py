@@ -183,9 +183,9 @@ def main(opt, logdir, nowname):
                  #"mode": "online", # changed from offline to mode which can be online/offline
                  "id": nowname,
                  #"id": "ht4epnn7",
-                 "project": "autoencoder-test-set-metrics",
+                 "project": "general-debugs",
                  #"config": config_to_log, # gives unexpected error, TypeError unless dict is empty
-                 "resume": "must"
+                 "resume": "allow"
                  # must link to wandb somehow as anonymous is set to never (default)
             }
         #},
