@@ -91,15 +91,14 @@ def main(opt):
     mse_list, ssim_list = [], []
     with torch.no_grad():
         with model.ema_scope():
-            for i, sample in tqdm(enumerate(data.datasets[split]), total=total_count):
-                if i % opt.skip_images != 0:
-                    continue
+            for i in tqdm(range(0, total_count, opt.skip_images)):
+                sample = data.datasets[split][i]
                 sample = {k: torch.from_numpy(np.expand_dims(sample[k], axis=0)).to(device) if isinstance(sample[k], (np.ndarray, np.generic)) else sample[k] for k in sample.keys()}
                 name = f"{k}_image{i}_{now}"
                 outpath = os.path.join(opt.outdir, name)
 
                 c = model.cond_stage_model(sample)
-                uc = {'c_concat': [torch.zeros_like(c)], 'c_crossattn': [c]}
+                uc = {'c_concat': c['c_concat'] if 'c_concat' in c.keys() else torch.zeros_like(c['c_crossattn'][0]), 'c_crossattn': c['c_crossattn']}
                 sample['image'] = sample['image'].permute(0, 3, 1, 2)
                 z = model.encode_first_stage(sample['image'])
                 samples_ddim, _ = sampler.sample(S=opt.steps,
@@ -129,9 +128,9 @@ def main(opt):
 
                 if opt.save_images: 
                     img = T(predicted_image)                   
-                    img.save(os.path.join(pred_folder, filenames[i] + "-pred.png"))
+                    img.save(os.path.join(pred_folder, name + "-pred.png"))
                     img = T(gt_image)
-                    img.save(os.path.join(gt_folder, filenames[i] + "-gt.png"))
+                    img.save(os.path.join(gt_folder, name + "-gt.png"))
 
 
     n_images_to_plot = min(8, len(predicted_images))
@@ -150,7 +149,7 @@ def main(opt):
                     title = f"GT, {conditions[i]}"
                 ax.imshow(image)
                 ax.axis('off')
-                ax.set_title(title)
+                ax.set_title(title, size=6)
     
     if not opt.pil:
         for i in range(n_images_to_plot):
