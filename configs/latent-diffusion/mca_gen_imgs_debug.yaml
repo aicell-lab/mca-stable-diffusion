@@ -2,7 +2,7 @@ model:
   base_learning_rate: 1 #5.0e-5   # set to target_lr by starting main.py with '--scale_lr False'
   target: ldm.models.diffusion.ddpm.LatentDiffusion
   params:
-    ckpt_path: /data/ethyni/mca/checkpoints/1st_ldm_last.ckpt
+    ckpt_path: /proj/aicell/data/stable-diffusion/mca/logs/ldm-keep-2024-03-21T11-49-01_mca_debug/checkpoints/last.ckpt
     linear_start: 0.0015
     linear_end: 0.0155
     num_timesteps_cond: 1
@@ -42,7 +42,7 @@ model:
         embed_dim: 3
         n_embed: 8192
         # pretrained autoencoder
-        ckpt_path: /data/ethyni/mca/checkpoints/autoencoder_best.ckpt
+        ckpt_path: /proj/aicell/data/stable-diffusion/mca/logs/ae-keep-2024-03-11T16-16-14_autoencoder_vq_f4_mca_data/checkpoints/epoch=000001-v1.ckpt
         ddconfig:
           double_z: false
           z_channels: 3
@@ -77,11 +77,11 @@ data:
     test:
       target: ldm.data.mca.MCACombineDataset
       params:
-        directories: /data/ethyni/mca/mitotic_cell_atlas_v1.0.1_exampledata/Data_tifs
-        cell_features: /data/ethyni/mca/cell_features_necessary_columns.txt
+        directories: "/proj/aicell/data/stable-diffusion/mca/mitotic_cell_atlas_v1.0.1_fulldata/Data_tifs /proj/aicell/data/stable-diffusion/mca/ftp.ebi.ac.uk/pub/databases/IDR/idr0052-walther-condensinmap/20181113-ftp/MitoSys"
+        cell_features: /proj/aicell/data/stable-diffusion/mca/cell_features_necessary_columns.txt
         group: 'train' 
         use_cached_paths: True 
-        cached_paths: /data/ethyni/stable-diffusion/ldm/data/europa-paths.json
+        cached_paths: /proj/aicell/data/stable-diffusion/mca/all-data-mca.json
         normalization: True
         random_angle: False
         train_val_split: 0.05

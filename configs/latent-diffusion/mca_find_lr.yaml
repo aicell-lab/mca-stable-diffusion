@@ -89,7 +89,7 @@ data:
     train:
       target: ldm.data.mca.MCACombineDataset
       params:
-        directories: "/data/ethyni/mca/mitotic_cell_atlas_v1.0.1_exampledata/Data_tifs"
+        directories: "/proj/aicell/data/stable-diffusion/mca/ftp.ebi.ac.uk/pub/databases/IDR/idr0052-walther-condensinmap/20181113-ftp/MitoSys /proj/aicell/data/stable-diffusion/mca/mitotic_cell_atlas_v1.0.1_fulldata/Data_tifs"
         cell_features: /proj/aicell/data/stable-diffusion/mca/cell_features_necessary_columns.txt
         group: 'train' 
         use_cached_paths: True 
@@ -99,7 +99,7 @@ data:
     validation:
       target: ldm.data.mca.MCACombineDataset
       params:
-        directories: "/proj/aicell/data/stable-diffusion/mca/mitotic_cell_atlas_v1.0.1/Data_tifs /proj/aicell/data/stable-diffusion/mca/ftp..."
+        directories: "/proj/aicell/data/stable-diffusion/mca/ftp.ebi.ac.uk/pub/databases/IDR/idr0052-walther-condensinmap/20181113-ftp/MitoSys /proj/aicell/data/stable-diffusion/mca/mitotic_cell_atlas_v1.0.1_fulldata/Data_tifs"
         cell_features: /proj/aicell/data/stable-diffusion/mca/cell_features_necessary_columns.txt
         group: 'validation'
         use_cached_paths: True
