@@ -71,9 +71,9 @@ model:
           target: torch.nn.Identity
 
     cond_stage_config:
-      target: ldm.data.mca.MCALabelEmbedder
+      target: ldm.data.mca.MCAConditionEmbedder
       params:
-        layer_1_size: 128
+        hidden_layers: [128]
         output_size_context_dim: 128
         
 
