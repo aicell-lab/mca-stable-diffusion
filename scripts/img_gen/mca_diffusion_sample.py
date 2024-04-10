@@ -173,7 +173,7 @@ def main(opt):
     mse_mean = np.mean(mse_list)
     ssim_mean = np.mean(ssim_list) 
     fig.suptitle(f'{split} reference, guidance scale={opt.scale}, DDIM steps={opt.steps}, MSE: {mse_mean:.2g}, SSIM: {ssim_mean:.2g}')
-    fig.savefig(os.path.join(opt.outdir, f'predicted-image-grid-s{opt.scale}.png'))
+    fig.savefig(os.path.join(opt.outdir, f'predicted-image-grid-s{opt.scale}-{now}.png'))
     fig.tight_layout()
 
     
