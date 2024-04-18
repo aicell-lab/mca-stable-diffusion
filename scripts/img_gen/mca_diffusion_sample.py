@@ -30,9 +30,10 @@ Command example: CUDA_VISIBLE_DEVICES=0 python scripts/prot2img.py --config=conf
 def condtions_to_text(c):
     # stage, stack_idx, poi
     c = c.cpu()
-    stage = int(c[:, 0]*20)
-    stack_idx = int(c[:, 1]*31)
-    poi = torch.argmax(c[:, 2:])
+    stage = int(c[:, 0])
+    stack_idx = int(c[:, 1])
+    #poi = torch.argmax(c[:, 2:])
+    poi = c[:, 2]
     poi = list(protein_dict.values()).index(poi)
     poi = list(protein_dict.keys())[poi]
 
@@ -121,7 +122,7 @@ def main(opt):
                 predicted_image = x_samples_ddim.squeeze(0)
 
                 stage, stack_idx, poi = condtions_to_text(sample['labels'])
-                conditions.append(f"Cell stage:{stage} stack position:{stack_idx} and POI:{poi}")
+                conditions.append(f"Cell stage:{stage}, stack position:{stack_idx}, and POI:{poi}")
                 predicted_images.append(predicted_image)
                 gt_images.append(gt_image)
                 filenames.append(name)
