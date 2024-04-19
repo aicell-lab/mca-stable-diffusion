@@ -183,7 +183,7 @@ def main(opt, logdir, nowname):
                  #"mode": "online", # changed from offline to mode which can be online/offline
                  "id": nowname,
                  #"id": "ht4epnn7",
-                 "project": "general-debugs",
+                 "project": "ldm-training-128-128",
                  #"config": config_to_log, # gives unexpected error, TypeError unless dict is empty
                  "resume": "allow"
                  # must link to wandb somehow as anonymous is set to never (default)
@@ -265,23 +265,23 @@ def main(opt, logdir, nowname):
         },
         "cpu_mem_monitor": {
             "target": "ldm.callbacks.CPUMemoryMonitor"
-        },
-        "early_stopping_callback":{
+        } #,
+        #"early_stopping_callback":{
             #"target": "ldm.callbacks.CustomEarlyStopping",
-            "target": "pytorch_lightning.callbacks.EarlyStopping",
-            "params": {
-            "monitor": "val/loss_simple_ema", 
+        #    "target": "pytorch_lightning.callbacks.EarlyStopping",
+        #    "params": {
+        #    "monitor": "val/loss_simple_ema", 
             #"monitor": "train/loss_step",
-            "mode": "min", 
-            "patience": 10,
-            "min_delta": 0.0, 
-            "divergence_threshold": 0.6, 
-            "check_on_train_epoch_end": False, # run early stopping at the end of validation
-            "verbose": True #,
+        #    "mode": "min", 
+        #    "patience": 10,
+        #    "min_delta": 0.0, 
+        #    "divergence_threshold": 0.6, 
+        #    "check_on_train_epoch_end": False, # run early stopping at the end of validation
+        #    "verbose": True #,
             #"check_frequency_gs": 5000,
             #"start_check_from_gs": 4999
-            }
-        }
+        #    }
+        #}
     }
     if version.parse(pl.__version__) >= version.parse('1.4.0'):
         default_callbacks_cfg.update({'checkpoint_callback': modelckpt_cfg})
