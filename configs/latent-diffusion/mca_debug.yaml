@@ -1,8 +1,8 @@
 model:
-  base_learning_rate: 1.15e-8 # learning rate with lr_scheduler #5.0e-5   # set to target_lr by starting main.py with '--scale_lr False'
+  base_learning_rate: 1.15e-8 #4.6e-8 #1.15e-8 # learning rate with lr_scheduler #5.0e-5   # set to target_lr by starting main.py with '--scale_lr False'
   target: ldm.models.diffusion.ddpm.LatentDiffusion
   params:
-    ckpt_path: /proj/aicell/data/stable-diffusion/mca/logs/ldm-keep-2024-03-21T11-49-01_mca_debug/checkpoints/last.ckpt
+    ckpt_path: /proj/aicell/data/stable-diffusion/mca/logs/ldm-v1-round2-2024-04-11T09-31-27_mca_debug/checkpoints/last.ckpt
     linear_start: 0.0015
     linear_end: 0.0155
     num_timesteps_cond: 1
