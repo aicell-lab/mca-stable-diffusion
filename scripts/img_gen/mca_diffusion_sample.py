@@ -28,6 +28,7 @@ Command example: CUDA_VISIBLE_DEVICES=0 python scripts/prot2img.py --config=conf
 """
 
 def condtions_to_text(c):
+    """Convert the labels to text"""
     # stage, stack_idx, poi
     c = c.cpu()
     stage = int(c[:, 0])
@@ -38,6 +39,14 @@ def condtions_to_text(c):
     poi = list(protein_dict.keys())[poi]
 
     return stage, stack_idx, poi
+
+
+def normalize_image_percentile(image, channel, percentiles=torch.FloatTensor([0.01, 0.99])) -> None:
+    """Renormalize the generated images in the same way that the ground truth images were normalized"""
+    # normalization using percentiles   
+    percentiles = torch.FloatTensor([0.01, 0.99]).to(image.device)
+    low, high = torch.quantile(image[channel, :, :], percentiles)
+    image[channel, :, :] = torch.clamp((image[channel, :, :] - low) / (high - low), -1, 1)
 
 
 
@@ -115,11 +124,18 @@ def main(opt):
                 mse_list.append(mse)
                 ssim_list.append(ssim)
 
+
+
                 #gt_image = torch.clamp((sample['image']+1.0)/2.0, min=0.0, max=1.0)
                 #predicted_image = torch.clamp((x_samples_ddim+1.0)/2.0, min=0.0, max=1.0)
                 
                 gt_image = sample['image'].squeeze(0)
                 predicted_image = x_samples_ddim.squeeze(0)
+
+                for j in range(3):
+                        normalize_image_percentile(predicted_image, channel=j)
+                
+                #predicted_image = torch.clamp((predicted_image+1.0)/2.0, min=0.0, max=1.0)
 
                 stage, stack_idx, poi = condtions_to_text(sample['labels'])
                 conditions.append(f"Cell stage:{stage}, stack position:{stack_idx}, and POI:{poi}")
@@ -134,7 +150,7 @@ def main(opt):
                     img.save(os.path.join(gt_folder, name + "-gt.png"))
 
 
-    n_images_to_plot = min(8, len(predicted_images))
+    n_images_to_plot = min(4, len(predicted_images))
     fig, axes = plt.subplots(n_images_to_plot, 2, figsize=(10,10)) 
      
     if opt.pil:
@@ -181,7 +197,7 @@ def main(opt):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Predict protein images. Example command: python scripts/prot2img.py --config=configs/latent-diffusion/hpa-ldm-vq-4-hybrid-protein-location-augmentation.yaml --checkpoint=logs/2023-04-07T01-25-41_hpa-ldm-vq-4-hybrid-protein-location-augmentation/checkpoints/last.ckpt --scale=2 --outdir=./data/22-fixed --fix-reference")
+    parser = argparse.ArgumentParser(description="Predict mca images. Example command: python scripts/img_gen/mca_diffusion_sample.py --checkpoint=/proj/aicell/data/stable-diffusion/mca/logs/ldm-v1-round3-2024-04-15T13-03-57_mca_debug/checkpoints/epoch=000002.ckpt --config=/proj/aicell/users/x_emmku/stable-diffusion/configs/latent-diffusion/mca_gen_imgs_debug.yaml --gpu=0 --skip_images=100 --scale=10 --steps=100 --save_images=True" )
     parser.add_argument(
         "--config",
         type=str,
@@ -243,14 +259,14 @@ if __name__ == "__main__":
         type=int,
         nargs="?",
         default=1,
-        help="how much of the dataset to generate images from",
+        help="Choose stepsize to optionally skip some of the images in the dataset",
     )
     parser.add_argument(
         "--save_images",
         type=str2bool,
         nargs="?",
         default=False,
-        help="if true save images to disk",
+        help="if true save images to disk in checkpoint directory",
     )
       
     opt = parser.parse_args()

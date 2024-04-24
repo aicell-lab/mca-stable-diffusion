@@ -84,5 +84,5 @@ data:
         cached_paths: /proj/aicell/data/stable-diffusion/mca/all-data-mca.json
         normalization: True
         random_angle: False
-        train_val_split: 0.05
+        train_val_split: 1
     
