@@ -5,7 +5,7 @@ model:
     embed_dim: 3
     n_embed: 8192
     monitor: val/rec_loss
-    #ckpt_path: models/first_stage_models/vq-f4/model.ckpt  # no ckpt available in repo
+    ckpt_path: /proj/aicell/data/stable-diffusion/mca/logs/ae-keep-2024-03-11T16-16-14_autoencoder_vq_f4_mca_data/checkpoints/epoch=000001-v1.ckpt  # ckpt to best autoencoder model
 
     ddconfig:
       double_z: false
@@ -34,22 +34,22 @@ model:
 data:
   target: main.DataModuleFromConfig
   params:
-    batch_size: 2
-    # num_workers: 0 # disable multiprocessing
+    batch_size: 8
+    num_workers: 8 # disable multiprocessing
     wrap: True
-    train:
+    test:
       target: ldm.data.mca.MCACombineDataset
       params:
         directories: '/proj/aicell/data/stable-diffusion/mca/mitotic_cell_atlas_v1.0.1_fulldata/Data_tifs /proj/aicell/data/stable-diffusion/mca/ftp.ebi.ac.uk/pub/databases/IDR/idr0052-walther-condensinmap/20181113-ftp/MitoSys'
-        cell_features: '/data/ethyni/mca/cell_features_necessary_columns.txt'
-        group: 'train'
-        
-    validation:
-      target: ldm.data.mca.MCACombineDataset
-      params:
-        directories: '/proj/aicell/data/stable-diffusion/mca/mitotic_cell_atlas_v1.0.1_fulldata/Data_tifs /proj/aicell/data/stable-diffusion/mca/ftp.ebi.ac.uk/pub/databases/IDR/idr0052-walther-condensinmap/20181113-ftp/MitoSys'
-        cell_features: '/data/ethyni/mca/cell_features_necessary_columns.txt'
+        cell_features: /proj/aicell/data/stable-diffusion/mca/cell_features_necessary_columns.txt
         group: 'validation'
+        use_cached_paths: True
+        cached_paths: /proj/aicell/data/stable-diffusion/mca/test-10-data-mca.json
+        train_val_split: 1.0
+        normalization: true
+        random_angle: false
+
+
 
 lightning:
   callbacks:
