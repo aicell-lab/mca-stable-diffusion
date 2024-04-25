@@ -3,7 +3,7 @@
 #SBATCH --gpus=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
-#SBATCH -t 0-12:00:00
+#SBATCH -t 0-20:00:00
 #SBATCH -C 'thin'
 #SBATCH -o /proj/aicell/data/stable-diffusion/mca/logs/slurm-%j.out
 
