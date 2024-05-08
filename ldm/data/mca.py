@@ -185,11 +185,7 @@ class MCACombineDataset(Dataset):
         stack_idx = idx % self.z_stacks if self.skip_top_bottom == 0 else idx % (self.z_stacks - 2 * self.skip_top_bottom) + self.skip_top_bottom
         img_path = self.img_paths[image_idx]
         image = AICSImage(img_path, reader=TiffReader)
-        #image = image.get_image_dask_data('ZYX')
-        # poi channel, nuc channel, cell channel is original order
-        #change order here already to prepare for rgb format, r= cell, g=poi, b=nuc
-        #image = image[[stack_idx + 2 * self.z_stacks, stack_idx, stack_idx + self.z_stacks], :, :]
-
+        
         #workaround error with get_image_dask_data
         poi_img = image.get_image_data('XY', C=0, T=0, Z=stack_idx)
         nuc = image.get_image_data('XY', C=0, T=0, Z=stack_idx + self.z_stacks)
@@ -353,10 +349,70 @@ def create_cached_paths():
 
     with open(test, 'w') as file:
         json.dump(test_img, file)
+
+
+def find_images_with_same_condition(protein_str, mst, z, save_paths=False, only_one_image=False):
+    cf_path = "/proj/aicell/data/stable-diffusion/mca/cell_features_necessary_columns.txt"
+    dirs = "/proj/aicell/data/stable-diffusion/mca/ftp.ebi.ac.uk/pub/databases/IDR/idr0052-walther-condensinmap/20181113-ftp/MitoSys /proj/aicell/data/stable-diffusion/mca/mitotic_cell_atlas_v1.0.1_fulldata/Data_tifs"
+    # Load all data
+    dataset = MCACombineDataset(dirs, cf_path, use_cached_paths=True, cached_paths="/proj/aicell/data/stable-diffusion/mca/all-data-mca.json",
+                                 group='train', train_val_split=1.0)
+    # check if the input is correct
     
+    assert protein_str in protein_dict.keys() 
+    assert mst in range(1,21), 'mst must be between 1 and 20 as that is how it is defined in the cell_features.txt file but later the mst label will be rescaled to 0-19'
+    assert z in range(31) 
+
+    
+    # remove the image paths that do not have protein
+    # faster to loop through the paths than the images
+    i=0  
+    protein = protein_dict[protein_str] 
+    
+    while i <  len(dataset.img_paths):
+        img_path = dataset.img_paths[i]
+        stage, poi = dataset._extract_labels(img_path)
+        if poi == protein and stage == mst:
+            i+=1
+            if only_one_image:
+                # the first path in the list has the same protein and mst
+                # this means the first 0-30 idx images in the dataset has the same protein and mst
+                # now only choose the required z-stack
+                assert dataset[z]['labels'][0] == mst-1
+                assert dataset[z]['labels'][2] == protein
+                assert dataset[z]['labels'][1] == z
+                return [dataset[z]]
+                
+        else:
+            dataset.img_paths.remove(img_path)
+    
+    #save the paths to images with the same protein and mst
+    if save_paths:
+        with open(f'all_paths_mst_{mst}_poi_{protein_str}.json', 'w') as file:
+            json.dump(dataset.img_paths, file)
+    
+    
+    # find images with the same z-stack position
+    # now the only images left should be the ones with the same protein and mst
+    images_with_same_z = []
+    
+    for i in range(0, len(dataset)):
+        if i % dataset.z_stacks == z:
+            images_with_same_z.append(dataset[i])
+
+            assert dataset[i]['labels'][0] == mst-1
+            assert dataset[i]['labels'][2] == protein
+            assert dataset[i]['labels'][1] == z
+            
+    assert len(images_with_same_z) == len(dataset.img_paths)
+    
+    return images_with_same_z
+
 
 def main():
-    
+    find_images_with_same_condition(protein_str='STAG2', mst=6, z=5, save_paths=True)
+
+    exit()
     dirs = "/proj/aicell/data/stable-diffusion/mca/ftp.ebi.ac.uk/pub/databases/IDR/idr0052-walther-condensinmap/20181113-ftp/MitoSys /proj/aicell/data/stable-diffusion/mca/mitotic_cell_atlas_v1.0.1_fulldata/Data_tifs"
     cf_path = "/proj/aicell/data/stable-diffusion/mca/cell_features_necessary_columns.txt"
 
