@@ -17,10 +17,10 @@ config="/proj/aicell/users/x_emmku/stable-diffusion/configs/latent-diffusion/mca
 gpu=0
 
 #args that will change often
-skip_imgs=$1
-scale=$2
-steps=$3
-save=$4
+scale=$1
+steps=$2
+comparison=$3
+skip_images=$4
 
 echo "Config used: $config"
 echo "Ckpt used: $ckpt"
@@ -28,4 +28,4 @@ echo "$skip_imgs skip images"
 echo "$scale scale"
 echo "$steps steps"
 
-python /proj/aicell/users/x_emmku/stable-diffusion/scripts/img_gen/mca_diffusion_sample.py --checkpoint=$ckpt --config=$config --gpu=$gpu --skip_images=$skip_imgs --scale=$scale --steps=$steps --save_images=$save
+python /proj/aicell/users/x_emmku/stable-diffusion/scripts/img_gen/mca_diffusion_sample.py --checkpoint=$ckpt --config=$config --gpu=$gpu --scale=$scale --steps=$steps -f single -k comparison_image=$comparison skip_images=$skip_images
