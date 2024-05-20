@@ -356,7 +356,7 @@ def find_images_with_same_condition(protein_str, mst, z, save_paths=False, only_
     dirs = "/proj/aicell/data/stable-diffusion/mca/ftp.ebi.ac.uk/pub/databases/IDR/idr0052-walther-condensinmap/20181113-ftp/MitoSys /proj/aicell/data/stable-diffusion/mca/mitotic_cell_atlas_v1.0.1_fulldata/Data_tifs"
     # Load all data
     dataset = MCACombineDataset(dirs, cf_path, use_cached_paths=True, cached_paths="/proj/aicell/data/stable-diffusion/mca/all-data-mca.json",
-                                 group='train', train_val_split=1.0)
+                                 group='train', train_val_split=1.0, normalization=True)
     # check if the input is correct
     
     assert protein_str in protein_dict.keys() 
