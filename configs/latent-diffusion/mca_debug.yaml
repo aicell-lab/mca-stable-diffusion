@@ -2,7 +2,7 @@ model:
   base_learning_rate: 1.15e-8 #4.6e-8 #1.15e-8 # learning rate with lr_scheduler #5.0e-5   # set to target_lr by starting main.py with '--scale_lr False'
   target: ldm.models.diffusion.ddpm.LatentDiffusion
   params:
-    ckpt_path: /proj/aicell/data/stable-diffusion/mca/logs/ldm-v1-round4-2024-04-19T15-48-43_mca_debug/checkpoints/last.ckpt
+    ckpt_path: /proj/aicell/data/stable-diffusion/mca/logs/2024-05-06T09-47-21_mca_debug/checkpoints/last.ckpt
     linear_start: 0.0015
     linear_end: 0.0155
     num_timesteps_cond: 1
@@ -129,11 +129,11 @@ lightning:
   trainer:
     benchmark: True
     accelerator: dp # need to change to dp because the default ddp will free the training
-    max_epochs: 3 # 1000 is default value for pl trainer
+    #max_epochs: 3 # 1000 is default value for pl trainer
     val_check_interval: 0.1
     #fast_dev_run: True 
     #profiler: pytorch
     #limit_train_batches: 100
     #limit_val_batches: 1
-    #resume_from_checkpoint: /data/ethyni/stable-diffusion/logs/temp/ldm-berzelius.ckpt
+    resume_from_checkpoint: /proj/aicell/data/stable-diffusion/mca/logs/2024-05-06T09-47-21_mca_debug/checkpoints/last.ckpt
     
