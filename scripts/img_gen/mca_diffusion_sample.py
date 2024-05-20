@@ -32,8 +32,11 @@ T = torchvision.transforms.ToPILImage()
 def condtions_to_text(c):
     """Convert the labels to text"""
     # stage, stack_idx, poi
-    c = c.cpu()
-    stage = int(c[:, 0])
+    try:
+        c = c.cpu()
+    except:
+        pass
+    stage = int(c[:, 0]) + 1 # convert back to starting mst at 1
     stack_idx = int(c[:, 1])
     #poi = torch.argmax(c[:, 2:])
     poi = c[:, 2]
@@ -51,6 +54,43 @@ def normalize_image_percentile(image, channel, percentiles=torch.FloatTensor([0.
     image[channel, :, :] = torch.clamp((image[channel, :, :] - low) / (high - low), -1, 1)
 
 
+def generate_images_varying_one_cond(now, opt, model, data, device, sampler, split="test"):
+    """
+    Generate images with the same condition, but varying one condition (mst, z, or protein_str)
+    """
+    keys = ['variation', 'num_images']
+    for key in keys:
+        assert key in opt.kwargs.keys(), f"Missing key {key} in opt.kwargs"
+    variation = opt.kwargs['variation']
+    num_images = int(opt.kwargs['num_images'])
+
+    assert variation in ['mst', 'z', 'poi'], f"variation must be one of ['mst', 'z', 'poi']"
+
+    options = {'mst': 10, 'z': 16, 'protein_str': 'TPR', 'num_images': num_images}
+    if variation == 'mst':
+        msts = range(1, 20, 2)
+        for mst in msts:
+            print(f"Varying mst: {mst}")
+            options['mst'] = mst
+            opt.kwargs = options
+            generate_images_by_cond(now, opt, model, data, device, sampler, split="test")
+    elif variation == 'z':
+        zs = range(0, 32, 3)
+        for z in zs:
+            print(f"Varying z: {z}")
+            options['z'] = z
+            opt.kwargs = options
+            generate_images_by_cond(now, opt, model, data, device, sampler, split="test")
+    elif variation == 'poi':
+        #pois = list(protein_dict.keys())
+        pois = ["APC2", "CENPA", "CTCF", "KIF4A", "MAD2L1", "NCAPD3", "NUP214", "PLK1", "RACGAP1", "RANBP2", "STAG2", "WAPL"]
+        for poi in pois:
+            print(f"Varying protein_str: {poi}")
+            options['protein_str'] = poi
+            opt.kwargs = options
+            generate_images_by_cond(now, opt, model, data, device, sampler, split="test")
+
+
 def generate_images_by_cond(now, opt, model, data, device, sampler, split="test"):
     """
     Generate any number of images with a certain condition decided by the user
@@ -63,7 +103,7 @@ def generate_images_by_cond(now, opt, model, data, device, sampler, split="test"
     protein_str = opt.kwargs['protein_str']
     num_images = int(opt.kwargs['num_images'])
 
-    name = f"mst_{mst}_z_{z}_poi_{protein_str}"
+    name = f"gamma_{opt.scale}_mst_{mst}_z_{z}_poi_{protein_str}"
 
     os.makedirs(opt.outdir, exist_ok=True)
     save_folder = os.path.join(opt.outdir, name)
@@ -85,8 +125,8 @@ def generate_images_by_cond(now, opt, model, data, device, sampler, split="test"
     # generate images
     with torch.no_grad():
         with model.ema_scope():
-            for i in tqdm(num_images):
-                img_name = f"image{i}__{now}"
+            for i in tqdm(range(0, num_images), desc="Generating images"):
+                img_name = f"image{i}__{now}.png"
                 samples_ddim, _ = sampler.sample(S=opt.steps,
                                                 conditioning=c,
                                                 batch_size=z.shape[0],
@@ -276,6 +316,50 @@ def single_image_generation(now, opt, model, data, device, sampler,  split="test
 
 
 
+def gt_z_stack(opt, device):
+    
+    keys = ['ind', 'dz', 'start','save_path']
+    for key in keys:
+        assert key in opt.kwargs.keys(), f"Missing key {key} in opt.kwargs"
+    
+
+    cf_path = "/proj/aicell/data/stable-diffusion/mca/cell_features_necessary_columns.txt" if not 'cf_path' in opt.kwargs.keys() else opt.kwargs['cf_path']
+    dirs = "/proj/aicell/data/stable-diffusion/mca/ftp.ebi.ac.uk/pub/databases/IDR/idr0052-walther-condensinmap/20181113-ftp/MitoSys /proj/aicell/data/stable-diffusion/mca/mitotic_cell_atlas_v1.0.1_fulldata/Data_tifs" if not 'dirs' in opt.kwargs.keys() else opt.kwargs['dirs']
+    # Load all data
+    dataset = MCACombineDataset(dirs, cf_path, use_cached_paths=True, cached_paths="/proj/aicell/data/stable-diffusion/mca/all-data-mca.json",
+                                 group='train', train_val_split=1.0, normalization=True)
+    
+    ind = int(opt.kwargs['ind']) # choose the z-stack index, which z-stack to show
+    ind = ind * dataset.z_stacks
+    dz = int(opt.kwargs['dz'])
+    start = int(opt.kwargs['start'])
+    assert ind <= len(dataset), f"Index {ind} is out of bounds"
+
+
+    images = []
+    for z in range(start, dataset.z_stacks, dz):
+        images.append(dataset[ind + z])
+        mst, z_ind, poi = condtions_to_text(np.expand_dims(images[-1]['labels'], axis=0))
+
+        assert z_ind == z, f"z index {z_ind} does not match z {z}"
+    
+    assert os.path.exists(opt.kwargs['save_path']), f"Save path {opt.kwargs['save_path']} does not exist"
+    dir_name = f"z_stack_dz_{dz}_mst_{mst}_poi_{poi}"
+    outdir = os.path.join(opt.kwargs['save_path'], dir_name)
+    os.makedirs(outdir, exist_ok=True)
+
+    total_count = len(images)
+    for i in tqdm(range(0, total_count)):
+        sample = images[i]
+        sample = {k: torch.from_numpy(np.expand_dims(sample[k], axis=0)).to(device) if isinstance(sample[k], (np.ndarray, np.generic)) else sample[k] for k in sample.keys()}
+        sample['image'] = sample['image'].permute(0, 3, 1, 2)
+        mst, z, poi = condtions_to_text(sample['labels'])
+        name = f"image{i}_mst_{mst}_z_{z}_poi_{poi}.png"
+        img = T(sample['image'].squeeze(0))
+        img.save(os.path.join(outdir, name))
+    print(f"Saved {total_count} images with the same condition to {outdir}")
+
+
 def save_gt_images_with_same_condition(opt, device):
     
     keys = ['mst', 'z', 'protein_str', 'save_path']
@@ -296,9 +380,10 @@ def save_gt_images_with_same_condition(opt, device):
     total_count = len(data)
     for i in tqdm(range(0, total_count)):
         sample = data[i]
-        sample = {k: sample[k] for k in sample.keys()}
+        sample = {k: torch.from_numpy(np.expand_dims(sample[k], axis=0)).to(device) if isinstance(sample[k], (np.ndarray, np.generic)) else sample[k] for k in sample.keys()}
+        sample['image'] = sample['image'].permute(0, 3, 1, 2)
         name = f"image{i}"
-        img = Image.fromarray(((sample['image']+1)/2*255).astype(np.uint8))
+        img = T(sample['image'].squeeze(0))
         img.save(os.path.join(outdir, name + ".png"))
     print(f"Saved {total_count} images with the same condition to {outdir}")
 
@@ -327,6 +412,10 @@ def main(opt):
         device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
         device = torch.device("cpu")
         save_gt_images_with_same_condition(opt, device)
+    elif opt.function_to_run == gt_z_stack:
+        device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+        device = torch.device("cpu")
+        gt_z_stack(opt, device)
     else:
         now = datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
         split = "test"
@@ -363,8 +452,10 @@ def main(opt):
         sampler = DDIMSampler(model)
 
         os.makedirs(opt.outdir, exist_ok=True)
-        print(f"Function to run: {opt.function_to_run}")
+        
         opt.function_to_run(now, opt, model, data, device, sampler,  split="test")
+        
+
         
             
         
@@ -418,7 +509,7 @@ if __name__ == "__main__":
     parser.add_argument(
         '-f',
         dest='function_to_run',
-        choices=['single', 'multiple', 'conditions', 'gt_images'],
+        choices=['single', 'multiple', 'conditions', 'gt_images', 'vary_one_cond', 'gt_z_stack'],
         default='single',
         required=True
     )
@@ -433,7 +524,8 @@ if __name__ == "__main__":
     opt = parser.parse_args()
 
     function_map = {'single': single_image_generation, 'multiple': multiple_image_generation, 
-                    'conditions': generate_images_by_cond, 'gt_images': save_gt_images_with_same_condition}
+                    'conditions': generate_images_by_cond, 'gt_images': save_gt_images_with_same_condition,
+                    'vary_one_cond': generate_images_varying_one_cond, 'gt_z_stack': gt_z_stack}
 
     opt.function_to_run = function_map[opt.function_to_run]
 
