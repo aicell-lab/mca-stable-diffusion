@@ -1352,10 +1352,10 @@ class LatentDiffusion(DDPM):
             columns = []
 
             c = self.cond_stage_model(batch)
-            #Added this line for mca, should probably change the c_concat as it is not 100% correct
-            uc = {'c_concat': [torch.zeros_like(v) for v in c['c_crossattn']], 'c_crossattn': c['c_crossattn']} 
-
-            # uc = {'c_concat': [torch.zeros_like(v) for v in c['c_concat']], 'c_crossattn': [torch.zeros_like(v) for v in c['c_crossattn']]} 
+            
+            if 'c_concat' not in c.keys():
+                c['c_concat'] = [torch.zeros_like(z)]
+            uc = {'c_concat': [torch.zeros_like(v) for v in c['c_concat']], 'c_crossattn': [torch.zeros_like(v) for v in c['c_crossattn']]} 
             # Keep the c_concat and set c_crossattn to zero
             #uc = {'c_concat': c['c_concat'], 'c_crossattn': [torch.zeros_like(v) for v in c['c_crossattn']]} 
 
