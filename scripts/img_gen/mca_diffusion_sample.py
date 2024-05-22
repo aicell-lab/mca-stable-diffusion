@@ -117,7 +117,8 @@ def generate_images_by_cond(now, opt, model, data, device, sampler, split="test"
     # get conditions from the sample
     model.eval()
     c = model.cond_stage_model(sample)
-    uc = {'c_concat': c['c_concat'] if 'c_concat' in c.keys() else torch.zeros_like(c['c_crossattn'][0]), 'c_crossattn': c['c_crossattn']}
+    #uc = {'c_concat': c['c_concat'] if 'c_concat' in c.keys() else torch.zeros_like(c['c_crossattn'][0]), 'c_crossattn': c['c_crossattn']}
+    uc = {'c_concat':  c['c_concat'] if 'c_concat' in c.keys() else torch.zeros_like(sample['image']), 'c_crossattn': [torch.zeros_like(ct) for ct in c['c_crossattn']]}
     sample['image'] = sample['image'].permute(0, 3, 1, 2)
     z = model.encode_first_stage(sample['image'])
     
@@ -188,7 +189,8 @@ def multiple_image_generation(now, opt, model, data, device, sampler,  split="te
                             condition_folders.append(save_folder)
 
                         c = model.cond_stage_model(sample)
-                        uc = {'c_concat': c['c_concat'] if 'c_concat' in c.keys() else torch.zeros_like(c['c_crossattn'][0]), 'c_crossattn': c['c_crossattn']}
+                        #uc = {'c_concat': c['c_concat'] if 'c_concat' in c.keys() else torch.zeros_like(c['c_crossattn'][0]), 'c_crossattn': c['c_crossattn']}
+                        uc = {'c_concat':  c['c_concat'] if 'c_concat' in c.keys() else torch.zeros_like(sample['image']), 'c_crossattn': [torch.zeros_like(ct) for ct in c['c_crossattn']]}
                         sample['image'] = sample['image'].permute(0, 3, 1, 2)
                         z = model.encode_first_stage(sample['image'])
                         samples_ddim, _ = sampler.sample(S=opt.steps,
@@ -252,7 +254,8 @@ def single_image_generation(now, opt, model, data, device, sampler,  split="test
                 name = f"image{i}_{now}"
 
                 c = model.cond_stage_model(sample)
-                uc = {'c_concat': c['c_concat'] if 'c_concat' in c.keys() else torch.zeros_like(c['c_crossattn'][0]), 'c_crossattn': c['c_crossattn']}
+                #uc = {'c_concat': c['c_concat'] if 'c_concat' in c.keys() else torch.zeros_like(c['c_crossattn'][0]), 'c_crossattn': c['c_crossattn']}
+                uc = {'c_concat':  c['c_concat'] if 'c_concat' in c.keys() else torch.zeros_like(sample['image']), 'c_crossattn': [torch.zeros_like(ct) for ct in c['c_crossattn']]}
                 sample['image'] = sample['image'].permute(0, 3, 1, 2)
                 z = model.encode_first_stage(sample['image'])
                 samples_ddim, _ = sampler.sample(S=opt.steps,
@@ -313,6 +316,61 @@ def single_image_generation(now, opt, model, data, device, sampler,  split="test
         fig.suptitle(f'{split} reference, guidance scale={opt.scale}, DDIM steps={opt.steps}, MSE: {mse_mean:.2g}, SSIM: {ssim_mean:.2g}')
         fig.savefig(os.path.join(opt.outdir, f'predicted-image-grid-s{opt.scale}-{now}.png'))
         fig.tight_layout()
+
+
+def single_image_random_generation(now, opt, model, data, device, sampler,  split="test"):
+    """
+    Genrerate one image per one ground truth image. With random indices.
+    """
+    # go over opt.kwargs
+    keys = ['num_images']
+    for k in keys:
+        assert k in opt.kwargs.keys(), f"Missing key {k} in opt.kwargs"
+    num_images = int(opt.kwargs['num_images'])
+    
+
+    gt_folder = os.path.join(opt.outdir,"ground_truth")
+    pred_folder = os.path.join(opt.outdir, "predicted")
+    os.makedirs(gt_folder, exist_ok=True)
+    os.makedirs(pred_folder, exist_ok=True)
+
+    total_count = len(data.datasets[split])
+    indices = random.sample(range(total_count), num_images)
+    
+    model.eval()
+    with torch.no_grad():
+        with model.ema_scope():
+            for i in tqdm(indices):
+                sample = data.datasets[split][i]
+                sample = {k: torch.from_numpy(np.expand_dims(sample[k], axis=0)).to(device) if isinstance(sample[k], (np.ndarray, np.generic)) else sample[k] for k in sample.keys()}
+                
+                c = model.cond_stage_model(sample)
+                #uc = {'c_concat': c['c_concat'] if 'c_concat' in c.keys() else torch.zeros_like(c['c_crossattn'][0]), 'c_crossattn': c['c_crossattn']}
+                uc = {'c_concat':  c['c_concat'] if 'c_concat' in c.keys() else torch.zeros_like(sample['image']), 'c_crossattn': [torch.zeros_like(ct) for ct in c['c_crossattn']]}
+                sample['image'] = sample['image'].permute(0, 3, 1, 2)
+                z = model.encode_first_stage(sample['image'])
+                samples_ddim, _ = sampler.sample(S=opt.steps,
+                                                conditioning=c,
+                                                batch_size=z.shape[0],
+                                                shape=z.shape[1:],
+                                                unconditional_guidance_scale=opt.scale,
+                                                unconditional_conditioning=uc,
+                                                verbose=False)
+                x_samples_ddim = model.decode_first_stage(samples_ddim)
+                
+                gt_image = sample['image'].squeeze(0)
+                predicted_image = x_samples_ddim.squeeze(0)
+
+                for j in range(3):
+                        normalize_image_percentile(predicted_image, channel=j)
+            
+                stage, stack_idx, poi = condtions_to_text(sample['labels'])
+                name = f"image{i}_mst{stage}_z{stack_idx}_poi{poi}__{now}"
+                
+                img = T(predicted_image)                   
+                img.save(os.path.join(pred_folder, name + "-pred.png"))
+                img = T(gt_image)
+                img.save(os.path.join(gt_folder, name + "-gt.png"))
 
 
 
@@ -509,7 +567,7 @@ if __name__ == "__main__":
     parser.add_argument(
         '-f',
         dest='function_to_run',
-        choices=['single', 'multiple', 'conditions', 'gt_images', 'vary_one_cond', 'gt_z_stack'],
+        choices=['single', 'multiple', 'conditions', 'gt_images', 'vary_one_cond', 'gt_z_stack', 'single_random'],
         default='single',
         required=True
     )
@@ -525,7 +583,8 @@ if __name__ == "__main__":
 
     function_map = {'single': single_image_generation, 'multiple': multiple_image_generation, 
                     'conditions': generate_images_by_cond, 'gt_images': save_gt_images_with_same_condition,
-                    'vary_one_cond': generate_images_varying_one_cond, 'gt_z_stack': gt_z_stack}
+                    'vary_one_cond': generate_images_varying_one_cond, 'gt_z_stack': gt_z_stack,
+                    'single_random': single_image_random_generation}
 
     opt.function_to_run = function_map[opt.function_to_run]
 
