@@ -162,8 +162,7 @@ def main(opt):
 
                 # encode masked image and concat downsampled mask
                 c = model.cond_stage_model(sample)
-                # uc = {'c_concat': [torch.zeros_like(v) for v in c['c_concat']], 'c_crossattn': [torch.zeros_like(v) for v in c['c_crossattn']]} #
-                uc = {'c_concat': c['c_concat'], 'c_crossattn': [torch.zeros_like(v) for v in c['c_crossattn']]} #
+                uc = {'c_concat': [torch.zeros_like(v) for v in c['c_concat']], 'c_crossattn': [torch.zeros_like(v) for v in c['c_crossattn']]} 
 
                 shape = (c['c_concat'][0].shape[1],)+c['c_concat'][0].shape[2:]
                 samples_ddim, _ = sampler.sample(S=opt.steps,
