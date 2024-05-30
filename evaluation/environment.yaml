@@ -1,0 +1,23 @@
+name: fld
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge  
+dependencies:
+  - python=3.8
+  - numpy
+  - pytorch=2.3
+  - pytorch-cuda=12.1
+  - torchvision>=0.14.0
+  - tqdm
+  - scikit-learn
+  - pandas
+  - scipy
+  - seaborn
+  - PyYAML
+  - umap-learn
+  - pip
+  - pip:
+    - pytorch_fid
+    - -e git+https://github.com/openai/CLIP.git@main#egg=clip
+    - -e git+https://github.com/marcojira/fld.git@main#egg=fld
