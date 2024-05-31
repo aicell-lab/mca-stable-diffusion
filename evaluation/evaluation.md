@@ -1,4 +1,4 @@
-# Project Name
+# Evaluation techniques for generated images
 
 ## Description
 
