@@ -13,7 +13,7 @@ Code is based upon functions from the repository fld from https://github.com/mar
 To set up the environment for this project, follow these steps:
 
 1. Create a conda environment using the provided `environment.yaml` file: `conda env create -f environment.yaml`
-2. Activate the conda environment: `conda activate [environment name]`
+2. Activate the conda environment: `conda activate eval`
 
 ## Analysis
 
