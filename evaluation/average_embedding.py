@@ -284,10 +284,10 @@ def one_condition_difference_analysis(function='umap', type_to_research='z', ima
     assert function in ['umap', 'PCA']
     if function == 'umap':
         umap_images_with_conditions(dirs, labels, save_path=save_path, type=type, extractor=extractor, type_to_research=type_to_research,
-                                         name=f'new_{extractor}_umap_{type}_{type_to_research}_one_difference.png')
+                                         name=f'{extractor}_umap_{type}_{type_to_research}_one_difference.png')
     else:
         PCA_cluster_images_with_conditions(dirs, labels, save_path=save_path, cluster_algorithm=cluster, type=type, extractor=extractor, type_to_research=type_to_research,
-                                         name=f'new_{extractor}_pca_{type}_{type_to_research}_one_difference.png', **kwargs)
+                                         name=f'{extractor}_pca_{type}_{type_to_research}_one_difference.png', **kwargs)
         
 
 

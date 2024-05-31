@@ -24,7 +24,7 @@ This project supports the following analysis:
 
 ### Calculate Metrics
 
-To calculate metrics, run the following command: `python fld/calculate_metrics.py -g /path/to/generated/images -t /path/to/training/images -f Inception --cache-path /path/to/cache_the_features`
+To calculate metrics, run the following command: `python calculate_metrics.py -g /path/to/generated/images -t /path/to/training/images -f Inception --cache-path /path/to/cache_the_features`
 
 ### Conditional evaluation using average_embedding.py
 
@@ -33,7 +33,7 @@ The method is based upon feature extraction from the images using a feature extr
 There are two primary analyses to perform. One where one label in the MCA dataset varies and the others are fixed and one where the different guidance levels are explored using this method.
 
 #### Different guidance levels
-To explore this, run the following command:`python fld/average_embedding.py different_guidance --guide /path/to/directory/with/differnt/guidance/images --dir_regex regex_to_find_subdirs_in_guide --gt /path/to/dir/of/ground/truth --save_path optional/path/to/cache/features --extractor Inception --labelregex regex_for_labels_from_dirnames_optional`
+To explore this, run the following command:`python average_embedding.py different_guidance --guide /path/to/directory/with/differnt/guidance/images --dir_regex regex_to_find_subdirs_in_guide --gt /path/to/dir/of/ground/truth --save_path optional/path/to/cache/features --extractor Inception --labelregex regex_for_labels_from_dirnames_optional`
 
 
 #### Varying one condition
