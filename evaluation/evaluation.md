@@ -7,6 +7,7 @@ This project contains code for evaluation of generated images from the mitotic c
 ## Code Source
 
 Code is based upon functions from the repository fld from https://github.com/marcojira/fld.git.
+
 ## Environment Setup
 
 To set up the environment for this project, follow these steps:
@@ -36,4 +37,4 @@ To explore this, run the following command:`python fld/average_embedding.py diff
 
 
 #### Varying one condition
-Run the following command: `python fld/average_embedding.py different_conditions --function umap --differnt_cond z --image_type gen --extractor Inception --dir /path/to/dir/with/subdirs --regex regex_to_find_subdirs_with_images_in_dir --save_path /path/to/cache/features/optional`
+Run the following command: `python fld/average_embedding.py different_conditions --function umap --different_cond z --image_type gen --extractor Inception --dir /path/to/dir/with/subdirs --regex regex_to_find_subdirs_with_images_in_dir --save_path /path/to/cache/features/optional`
