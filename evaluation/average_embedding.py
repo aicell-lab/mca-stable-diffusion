@@ -16,7 +16,7 @@ Example commands to launch:
 
 `python average_embedding.py different_guidance --guide /path/to/directory/with/differnt/guidance/images --dir_regex regex_to_find_subdirs_in_guide --gt /path/to/dir/of/ground/truth --save_path optional/path/to/cache/features --extractor Inception --labelregex regex_for_labels_from_dirnames_optional`
 
- `python average_embedding.py different_conditions --function umap --differnt_cond z --image_type gen --extractor Inception --dir /path/to/dir/with/subdirs --regex regex_to_find_subdirs_with_images_in_dir --save_path /path/to/cache/features/optional`
+ `python average_embedding.py different_conditions --function umap --different_cond z --image_type gen --extractor Inception --dir /path/to/dir/with/subdirs --regex regex_to_find_subdirs_with_images_in_dir --save_path /path/to/cache/features/optional`
 
 """
 
