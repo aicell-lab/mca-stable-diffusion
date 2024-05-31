@@ -1,12 +1,12 @@
 # Evaluation techniques for generated images
 
-## Description
+### Description
 
-This project contains code for evaluation of generated images from the mitotic cell atlas model.
+The files in this directory contain code for evaluation of generated images from the mitotic cell atlas model.
 
-## Code Source
+### Code Source
 
-Code is based upon functions from the repository fld from https://github.com/marcojira/fld.git.
+Code is based on functions from the repository fld from https://github.com/marcojira/fld.git. Thank you!
 
 ## Environment Setup
 
@@ -23,6 +23,7 @@ This project supports the following analysis:
 
 
 ### Calculate Metrics
+The methods are calculated by extracting features from the generated images `-g` and the training/real images `-t` using a feature extractor `-f`. Options for feature extractor are `Inception CLIP DINOv2`. Optionally provide a path to cache the features using `--cache-path`.
 
 To calculate metrics, run the following command: `python calculate_metrics.py -g /path/to/generated/images -t /path/to/training/images -f Inception --cache-path /path/to/cache_the_features`
 
