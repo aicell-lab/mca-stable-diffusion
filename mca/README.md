@@ -1,7 +1,7 @@
 
 # Mitotic Cell Atlas Stable Diffusion
 
-**IMPORTANT: checkpoints to models are too large for GitHub. Checkpoints for the autoencoder and the LDM are stored on Berzelius**
+**IMPORTANT: model checkpoints are too large for GitHub. Checkpoints for the autoencoder and the LDM are stored on Berzelius**
 
 ## How to run
 Quick instructions of how to run. 
