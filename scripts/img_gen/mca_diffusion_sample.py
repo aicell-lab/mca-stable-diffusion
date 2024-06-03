@@ -23,10 +23,6 @@ from ldm.data.mca import *
 from ldm.data.mca import protein_dict
 from torchvision.utils import make_grid
 
-"""
-Command example: CUDA_VISIBLE_DEVICES=0 python scripts/prot2img.py --config=configs/latent-diffusion/hpa-ldm-vq-4-hybrid-protein-location-augmentation.yaml --checkpoint=logs/2023-04-07T01-25-41_hpa-ldm-vq-4-hybrid-protein-location-augmentation/checkpoints/last.ckpt --scale=2 --outdir=./data/22-fixed --fix-reference
-
-"""
 T = torchvision.transforms.ToPILImage() 
 
 def condtions_to_text(c):
@@ -56,7 +52,24 @@ def normalize_image_percentile(image, channel, percentiles=torch.FloatTensor([0.
 
 def generate_images_varying_one_cond(now, opt, model, data, device, sampler, split="test"):
     """
-    Generate images with the same condition, but varying one condition (mst, z, or protein_str)
+    Generate images with the same condition, but varying one condition (mst, z, or protein_str). Used for analysis of the different condtions
+    and the umap analysis.
+
+    Parameters:
+    - now (str): The current timestamp.
+    - opt (object): An object containing the options for image generation.
+        -kwargs (dict): A dictionary containing the following keys:
+            - variation (str): The condition to vary (mst, z, or poi).
+            - num_images (int): The number of images to generate for each condition.
+    - model (object): The model used for image generation.
+    - data (object): The data used for image generation.
+    - device (str): The device used for image generation.
+    - sampler (object): The sampler used for image generation.
+    - split (str, optional): The split used for image generation. Defaults to "test".
+
+    Returns:
+    None
+
     """
     keys = ['variation', 'num_images']
     for key in keys:
@@ -93,8 +106,30 @@ def generate_images_varying_one_cond(now, opt, model, data, device, sampler, spl
 
 def generate_images_by_cond(now, opt, model, data, device, sampler, split="test"):
     """
-    Generate any number of images with a certain condition decided by the user
+    Generate any number of images with a certain condition decided by the user.
+
+    Args:
+        now (str): The current timestamp.
+        opt (object): An object containing various options and settings.
+            - kwargs (dict): A dictionary containing the following keys:
+                - mst (int): The mst value.
+                - z (int): The z value.
+                - protein_str (str): The protein string.
+                - num_images (int): The number of images to generate for this condition. 
+        model (object): The model used for image generation.
+        data (list): A list of data samples.
+        device (str): The device used for computation (e.g., 'cpu', 'cuda').
+        sampler (object): The sampler used for image generation.
+        split (str, optional): The data split to use (default is 'test').
+
+    Returns:
+        None
+
+    Raises:
+        AssertionError: If any of the required keys are missing in opt.kwargs.
+
     """
+
     keys = ['mst', 'z', 'protein_str', 'num_images']
     for key in keys:
         assert key in opt.kwargs.keys(), f"Missing key {key} in opt.kwargs"
@@ -122,7 +157,6 @@ def generate_images_by_cond(now, opt, model, data, device, sampler, split="test"
     sample['image'] = sample['image'].permute(0, 3, 1, 2)
     z = model.encode_first_stage(sample['image'])
     
-
     # generate images
     with torch.no_grad():
         with model.ema_scope():
@@ -146,10 +180,30 @@ def generate_images_by_cond(now, opt, model, data, device, sampler, split="test"
 
 
 
-def multiple_image_generation(now, opt, model, data, device, sampler,  split="test"):
+def multiple_image_generation(now, opt, model, data, device, sampler, split="test"):
     """
-    Generate many images based on one ground truth image.  The conditions are randomly selected.
+    Generate  images based on one ground truth image. The conditions are randomly selected.
+
+    Args:
+        now (str): The current timestamp.
+        opt (object): An object containing options and arguments.
+            - kwargs (dict): A dictionary containing the following keys:
+                - num_types (int): The number of conditions to generate from.
+                - num_images (int): The number of images to generate per num_types.
+        model (object): The model used for image generation.
+        data (object): The dataset used for image generation.
+        device (str): The device used for computation (e.g., 'cpu', 'cuda').
+        sampler (object): The sampler used for image generation.
+        split (str, optional): The dataset split to use (default is 'test').
+
+    Returns:
+        None
+
+    Raises:
+        AssertionError: If 'num_types' or 'num_images' is missing in opt.kwargs.
+
     """
+
     keys=['num_types', 'num_images']
     for k in keys:
         assert k in opt.kwargs.keys(), f"Missing key {k} in opt.kwargs"
@@ -162,7 +216,6 @@ def multiple_image_generation(now, opt, model, data, device, sampler,  split="te
     os.makedirs(gt_folder, exist_ok=True)
 
     condition_folders = []
-
 
     total_count = len(data.datasets[split])
     random_indices = random.sample(range(total_count), num_types)
@@ -224,10 +277,30 @@ def multiple_image_generation(now, opt, model, data, device, sampler,  split="te
                             img.save(os.path.join(gt_folder, name + conditions[-1] +"-gt.png"))
 
 
-def single_image_generation(now, opt, model, data, device, sampler,  split="test"):
+def image_generation_entire_dataset(now, opt, model, data, device, sampler, split="test"):
     """
-    Genrerate one image per one ground truth image. The ground truth images are all parsed over (unless opt.skip_images>1).
+    Go over all images in the dataset (unless skip_images > 1). Generate one image per one ground truth image.
+
+    Args:
+        now (str): The current timestamp.
+        opt (object): The options object containing various configuration options.
+            - kwargs (dict): A dictionary containing the following keys:
+                - skip_images (int): The number of images to skip.
+                - comparison_image (bool): Whether to generate a comparison image.
+        model (object): The model object used for image generation.
+        data (object): The data object containing the datasets.
+        device (str): The device to run the model on.
+        sampler (object): The sampler object used for sampling.
+        split (str, optional): The dataset split to use. Defaults to "test".
+
+    Returns:
+        None
+
+    Raises:
+        AssertionError: If any of the required keys are missing in opt.kwargs.
+
     """
+
     # go over opt.kwargs
     keys = ['skip_images', 'comparison_image']
     for k in keys:
@@ -320,7 +393,22 @@ def single_image_generation(now, opt, model, data, device, sampler,  split="test
 
 def single_image_random_generation(now, opt, model, data, device, sampler,  split="test"):
     """
-    Genrerate one image per one ground truth image. With random indices.
+    Generate one image per one ground truth image with random indices=random conditions.
+
+    Args:
+        now (str): The current timestamp.
+        opt (object): The options object containing the arguments.
+            - kwargs (dict): A dictionary containing the following keys:
+                - num_images (int): The number of images to generate.
+        model (object): The model object.
+        data (object): The data object containing the datasets.
+        device (str): The device to run the model on.
+        sampler (object): The sampler object.
+        split (str, optional): The dataset split to use. Defaults to "test".
+
+    Returns:
+        None
+
     """
     # go over opt.kwargs
     keys = ['num_images']
@@ -375,6 +463,32 @@ def single_image_random_generation(now, opt, model, data, device, sampler,  spli
 
 
 def gt_z_stack(opt, device):
+    """
+    Generates and saves a series of images with the same condition from a z-stack dataset.
+
+    Args:
+        opt (object): An object containing the options for generating the images.
+            The object should have the following attributes:
+                - kwargs (dict): A dictionary containing the following keys:
+                    - ind (int): The index of the z-stack to show.
+                    - dz (int): The step size for iterating through the z-stacks.
+                    - start (int): The starting index for iterating through the z-stacks.
+                    - save_path (str): The path to save the generated images.
+                    - cf_path (str, optional): The path to the cell features necessary columns file.
+                        Defaults to "/proj/aicell/data/stable-diffusion/mca/cell_features_necessary_columns.txt".
+                    - dirs (str, optional): The directories containing the z-stack dataset.
+                        Defaults to "/proj/aicell/data/stable-diffusion/mca/ftp.ebi.ac.uk/pub/databases/IDR/idr0052-walther-condensinmap/20181113-ftp/MitoSys /proj/aicell/data/stable-diffusion/mca/mitotic_cell_atlas_v1.0.1_fulldata/Data_tifs".
+        device (str): The device to use for processing the images.
+
+    Raises:
+        AssertionError: If any of the required keys are missing in opt.kwargs.
+        AssertionError: If the specified index is out of bounds.
+        AssertionError: If the save path does not exist.
+
+    Returns:
+        None: This function does not return any value. It saves the generated images to the specified save path.
+    """
+
     
     keys = ['ind', 'dz', 'start','save_path']
     for key in keys:
@@ -401,7 +515,7 @@ def gt_z_stack(opt, device):
 
         assert z_ind == z, f"z index {z_ind} does not match z {z}"
     
-    assert os.path.exists(opt.kwargs['save_path']), f"Save path {opt.kwargs['save_path']} does not exist"
+    assert os.path.exists(opt.kwargs['save_path']), f"Save ,path {opt.kwargs['save_path']} does not exist"
     dir_name = f"z_stack_dz_{dz}_mst_{mst}_poi_{poi}"
     outdir = os.path.join(opt.kwargs['save_path'], dir_name)
     os.makedirs(outdir, exist_ok=True)
@@ -419,6 +533,24 @@ def gt_z_stack(opt, device):
 
 
 def save_gt_images_with_same_condition(opt, device):
+    """
+    Saves ground truth images with the same condition.
+
+    Args:
+        opt (object): An object containing the options for saving the images.
+            It should have the following keys:
+                - mst (int): The value of mst.
+                - z (int): The value of z.
+                - protein_str (str): The protein string.
+                - save_path (str): The path to save the images.
+        device (str): The device to use for saving the images.
+
+    Raises:
+        AssertionError: If any of the required keys are missing in opt.kwargs or if the save path does not exist.
+
+    Returns:
+        None
+    """
     
     keys = ['mst', 'z', 'protein_str', 'save_path']
     for key in keys:
@@ -448,20 +580,34 @@ def save_gt_images_with_same_condition(opt, device):
 
 
 class ParseKwargs(argparse.Action):
+    """
+    Custom argparse action to parse keyword arguments.
+
+    This class is used as an action for argparse to parse keyword arguments
+    provided as command line arguments. It splits the arguments into key-value
+    pairs and stores them in a dictionary.
+
+    Args:
+        parser (argparse.ArgumentParser): The ArgumentParser object.
+        namespace (argparse.Namespace): The namespace object.
+        values (list): The list of values to parse.
+        option_string (str, optional): The option string. Defaults to None.
+    """
+
     def __call__(self, parser, namespace, values, option_string=None):
         kwargs = {}
         for value in values:
             key, val = value.split("=")
             kwargs[key] = val
-        setattr(namespace, self.dest, kwargs)        
+        setattr(namespace, self.dest, kwargs)
                 
                                
 def main(opt):
     """
-    Main function for generating predicted images using the MCA diffusion model.
+    Main function that executes the specified function based on the value of `opt.function_to_run`.
 
     Args:
-        opt (argparse.Namespace): Command-line arguments and options.
+        opt (argparse.Namespace): Command-line arguments.
 
     Returns:
         None
@@ -517,11 +663,9 @@ def main(opt):
         
             
         
-    
-
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Predict mca images. Example command: python scripts/img_gen/mca_diffusion_sample.py --checkpoint=/proj/aicell/data/stable-diffusion/mca/logs/ldm-v1-round3-2024-04-15T13-03-57_mca_debug/checkpoints/epoch=000002.ckpt --config=/proj/aicell/users/x_emmku/stable-diffusion/configs/latent-diffusion/mca_gen_imgs_debug.yaml --gpu=0 --skip_images=100 --scale=10 --steps=100 --save_images=True" )
+    parser = argparse.ArgumentParser(description="Predict mca images. Example command: python scripts/img_gen/mca_diffusion_sample.py --checkpoint=path/to/ckpt --config=path/to/config.yaml --gpu=0 --scale=10 --steps=100 -f function_to_run -k kwargs_for_function_to_run_parsed_using_ParseKwargs" )
     parser.add_argument(
         "--config",
         type=str,
@@ -567,24 +711,27 @@ if __name__ == "__main__":
     parser.add_argument(
         '-f',
         dest='function_to_run',
-        choices=['single', 'multiple', 'conditions', 'gt_images', 'vary_one_cond', 'gt_z_stack', 'single_random'],
+        choices=['single', 'multiple', 'conditions', 'gt_images', 'vary_one_cond', 'gt_z_stack', 'gen_from_entire_dataset'],
         default='single',
-        required=True
+        required=True,
+        help='This is the parameter that decides which function_to_run. The options are: single, multiple, conditions, gt_images, vary_one_cond, gt_z_stack, single_random.'
     )
     parser.add_argument(
         '-k',
         '--kwargs',
         nargs='*',
         action=ParseKwargs,
-        required=True
+        required=True,
+        help='kwargs for function_to_run parsed using ParseKwargs. The arguments after -k should be in the form key1=val1 key2=val2 ... keyn=valn. The keys should be the same as the keys in the function_to_run.'
     )
       
     opt = parser.parse_args()
 
-    function_map = {'single': single_image_generation, 'multiple': multiple_image_generation, 
+
+    function_map = {'gen_from_entire_dataset': image_generation_entire_dataset, 'multiple': multiple_image_generation, 
                     'conditions': generate_images_by_cond, 'gt_images': save_gt_images_with_same_condition,
                     'vary_one_cond': generate_images_varying_one_cond, 'gt_z_stack': gt_z_stack,
-                    'single_random': single_image_random_generation}
+                    'single': single_image_random_generation}
 
     opt.function_to_run = function_map[opt.function_to_run]
 
