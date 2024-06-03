@@ -1,7 +1,7 @@
 
 # Mitotic Cell Atlas Stable Diffusion
 
-==IMPORTANT: checkpoints to models are too large for GitHub. Checkpoints for the autoencoder and the LDM are stored on Berzelius /proj/aicell/data/stable-diffusion/mca/checkpoints==
+**IMPORTANT: checkpoints to models are too large for GitHub. Checkpoints for the autoencoder and the LDM are stored on Berzelius**
 
 ## How to run
 Quick instructions of how to run. 
@@ -28,12 +28,12 @@ python main.py -t -b mca/models/mca_config.yaml -l path/to/logdir --gpus=0, --sc
 Generate 1000 images with guidance 1 and ddim steps 100 using the trained ldm. Change checkpoint and config to get new model.
 ````
 conda activate ldm2
-python mca_diffusion_sample.py --checkpoint=mca/models/mca_ldm.ckpt --config=mca/models/mca_config.yaml --steps=100 --scale=1 -f single_random -k num_images=1000
+python mca_diffusion_sample.py --checkpoint=path/to/mca_ldm.ckpt --config=mca/models/mca_config.yaml --steps=100 --scale=1 -f single_random -k num_images=1000
 ````
 
 
 ### Evaluation
-Evaluation pipeline. 
+Evaluation pipeline. More descriptions in evaluation/evaluation.md 
 
 Calculation of metrics:
 ````
@@ -44,7 +44,7 @@ python calculate_metrics.py -g /path/to/generated/images -t /path/to/training/im
 Feature extraction and UMAP dimension reduction:
 ````
 conda activate eval
-python average_embedding.py different_guidance --guide /path/to/directory/with/differnt/guidance/images --dir_regex regex_to_find_subdirs_in_guide --gt /path/to/dir/of/ground/truth --save_path optional/path/to/cache/features --extractor Inception --labelregex regex_for_labels_from_dirnames_optional
+python average_embedding.py different_guidance --guide /path/to/directory/with/different/guidance/images --dir_regex regex_to_find_subdirs_in_guide --gt /path/to/dir/of/ground/truth --save_path optional/path/to/cache/features --extractor Inception --labelregex regex_for_labels_from_dirnames_optional
 ````
 ````
 conda activate eval
@@ -58,10 +58,10 @@ python fld/average_embedding.py different_conditions --function umap --different
 General configs utilized sometime during the work. Look here for inspiration about how to include noise in images or use masks.
 
 #### Evaluation
-Contains code for the evaluation pipeline. Code is documented and described further how to use in evaluation.md.
+Contains code for the evaluation pipeline. Code is documented and described further how to use in evaluation/evaluation.md.
 
 #### Models
-Contains checkpoints to the two models that are used and their respective configs needed to train/sample from. The `ckpt_path` needs to be changed.
+Configs for the autoencoder and ldm to use for training or sampling.  The `ckpt_path` needs to be changed for training. Note that the checkpoints are too large to store on GitHub. 
 
 ## Important files 
 
@@ -108,12 +108,12 @@ Script for sampling from the trained latent diffusion model. Can perform many di
 
 Generate 1000 images with guidance scale 1 and 100 DDIM steps. 
 ````
-python scripts/img_gen/mca_diffusion_sample.py --checkpoint=mca/models/mca_ldm.ckpt --config=mca/models/mca_config.yaml --scale=1 --steps=100 -f single -k num_images=1000
+python scripts/img_gen/mca_diffusion_sample.py --checkpoint=path/to/mca_ldm.ckpt --config=mca/models/mca_config.yaml --scale=1 --steps=100 -f single -k num_images=1000
 ````
 
 Generate 100 images with the condition mst=5, z=14 and protein=CENPA with guidance scale 1 and 100 DDIM steps. All available proteins exist in protein_dict in mca.py. The ranges for mst are integers in [1, 20] and for z it is integers in [0, 30]. Example:
 ````
-python scripts/img_gen/mca_diffusion_sample.py --checkpoint=mca/models/mca_ldm.ckpt --config=mca/models/mca_config.yaml --scale=1 --steps=100 -f conditions -k num_images=100 mst=5 z=14 protein_str=CENPA
+python scripts/img_gen/mca_diffusion_sample.py --checkpoint=path/to/mca_ldm.ckpt --config=mca/models/mca_config.yaml --scale=1 --steps=100 -f conditions -k num_images=100 mst=5 z=14 protein_str=CENPA
 ````
 
 There are many other functions to choose from in mca_diffusion_sample.py, but these are the main ones to generate images and the other functions are written for a specific purpose. File is found in mca-stable-diffusion/scripts/img_gen/mca_sample_diffusion.py
@@ -122,5 +122,5 @@ There are many other functions to choose from in mca_diffusion_sample.py, but th
 ### Berzelius specific info
 There are a bunch of batch scripts written for Berzelius. Useful in terms of slurm commands and also example usage. In scripts/batch_scripts_berzelius.
 
-The data on Berzelius is stored in `/proj/aicell/data/stable-diffusion/mca`. There is a README.md there to explain the folder structure. 
+The data on Berzelius is stored in the `mca` folder. There is a README.md there to explain the structure of `mca`. 
 
