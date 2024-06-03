@@ -33,7 +33,7 @@ python mca_diffusion_sample.py --checkpoint=path/to/mca_ldm.ckpt --config=mca/mo
 
 
 ### Evaluation
-Evaluation pipeline. More descriptions in evaluation/evaluation.md 
+Evaluation pipeline. More descriptions in evaluation/README.md 
 
 Calculation of metrics:
 ````
@@ -58,7 +58,7 @@ python fld/average_embedding.py different_conditions --function umap --different
 General configs utilized sometime during the work. Look here for inspiration about how to include noise in images or use masks.
 
 #### Evaluation
-Contains code for the evaluation pipeline. Code is documented and described further how to use in evaluation/evaluation.md.
+Contains code for the evaluation pipeline. Code is documented and described further how to use in evaluation/README.md.
 
 #### Models
 Configs for the autoencoder and ldm to use for training or sampling.  The `ckpt_path` needs to be changed for training. Note that the checkpoints are too large to store on GitHub. 
