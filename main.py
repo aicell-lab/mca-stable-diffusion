@@ -520,7 +520,7 @@ if __name__ == "__main__":
         logdir = os.path.join(opt.logdir, "debug_logs" if opt.debug else "logs", nowname)
         os.makedirs(logdir)
     # wandb.init(project="super-multiplex-cell", config=opt, resume="allow", settings=wandb.Settings(start_method="fork"), name=nowname, mode="offline" if opt.debug else "online", id=nowname)
-    wandb.login(key='54afc5be46e10fbcdceca895ba75d2451da3d299')
+    wandb.login(key='your_key')
 
     if opt.debug:
         main(opt, logdir, nowname)
