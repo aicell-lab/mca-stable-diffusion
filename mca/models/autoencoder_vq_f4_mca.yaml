@@ -5,8 +5,8 @@ model:
     embed_dim: 3
     n_embed: 8192
     monitor: val/rec_loss
-    #ckpt_path: /proj/aicell/data/stable-diffusion/mca/logs/ae-keep-2024-03-11T16-16-14_autoencoder_vq_f4_mca_data/checkpoints/epoch=000001-v1.ckpt  # ckpt to best autoencoder model
-    ckpt_path: path/to/autoencoder.ckpt
+    ckpt_path: /proj/aicell/data/stable-diffusion/mca/checkpoints/weights_autoencoder.ckpt  # ckpt to best autoencoder model
+    #ckpt_path: path/to/autoencoder.ckpt
 
     ddconfig:
       double_z: false
@@ -38,17 +38,26 @@ data:
     batch_size: 8
     num_workers: 8 # disable multiprocessing
     wrap: True
-    test:
+    train:
       target: ldm.data.mca.MCACombineDataset
       params:
         directories: '/proj/aicell/data/stable-diffusion/mca/data/mitotic_cell_atlas_v1.0.1_fulldata/Data_tifs /proj/aicell/data/stable-diffusion/mca/data/ftp.ebi.ac.uk/pub/databases/IDR/idr0052-walther-condensinmap/20181113-ftp/MitoSys'
         cell_features: /proj/aicell/data/stable-diffusion/mca/labels/cell_features_necessary_columns.txt
         group: 'validation'
         use_cached_paths: True
-        cached_paths: /proj/aicell/data/stable-diffusion/mca/labels/test-10-data-mca.json
-        train_val_split: 1.0
+        cached_paths: /proj/aicell/data/stable-diffusion/mca/cache_paths/train-90-data-mca.json
         normalization: true
-        random_angle: false
+        random_angle: true
+    validation:
+      target: ldm.data.mca.MCACombineDataset
+      params:
+        directories: '/proj/aicell/data/stable-diffusion/mca/data/mitotic_cell_atlas_v1.0.1_fulldata/Data_tifs /proj/aicell/data/stable-diffusion/mca/data/ftp.ebi.ac.uk/pub/databases/IDR/idr0052-walther-condensinmap/20181113-ftp/MitoSys'
+        cell_features: /proj/aicell/data/stable-diffusion/mca/labels/cell_features_necessary_columns.txt
+        group: 'validation'
+        use_cached_paths: True
+        cached_paths: /proj/aicell/data/stable-diffusion/mca/cache_paths/train-90-data-mca.json
+        normalization: true
+        random_angle: true
 
 
 

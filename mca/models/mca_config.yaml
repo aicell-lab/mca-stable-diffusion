@@ -2,7 +2,7 @@ model:
   base_learning_rate: 1.15e-8 #4.6e-8 #1.15e-8 # learning rate with lr_scheduler #5.0e-5   # set to target_lr by starting main.py with '--scale_lr False'
   target: ldm.models.diffusion.ddpm.LatentDiffusion
   params:
-    #ckpt_path: /proj/aicell/data/stable-diffusion/mca/logs/ldm-v1-round4-2024-04-19T15-48-43_mca_debug/checkpoints/epoch=000000-v1.ckpt
+    #ckpt_path: /proj/aicell/data/stable-diffusion/mca/checkpoints/weights_ldm.ckpt
     ckpt_path: path/to/mca_ldm.ckpt
     linear_start: 0.0015
     linear_end: 0.0155
@@ -53,7 +53,7 @@ model:
       params:
         embed_dim: 3
         n_embed: 8192
-        #ckpt_path: /proj/aicell/data/stable-diffusion/mca/logs/ae-keep-2024-03-11T16-16-14_autoencoder_vq_f4_mca_data/checkpoints/epoch=000001-v1.ckpt
+        #ckpt_path: /proj/aicell/data/stable-diffusion/mca/checkpoints/weights_autoencoder.ckpt
         ckpt_path: path/to/autoencoder.ckpt
         ddconfig:
           double_z: false
@@ -93,7 +93,7 @@ data:
         cell_features: /proj/aicell/data/stable-diffusion/mca/labels/cell_features_necessary_columns.txt
         group: 'train' 
         use_cached_paths: True 
-        cached_paths: /proj/aicell/data/stable-diffusion/mca/labels/all-data-mca.json   
+        cached_paths: /proj/aicell/data/stable-diffusion/mca/cache_paths/all-data-mca.json   
         normalization: True
         random_angle: True
     validation:
@@ -103,7 +103,7 @@ data:
         cell_features: /proj/aicell/data/stable-diffusion/mca/labels/cell_features_necessary_columns.txt
         group: 'validation'
         use_cached_paths: True
-        cached_paths: /proj/aicell/data/stable-diffusion/mca/labels/all-data-mca.json
+        cached_paths: /proj/aicell/data/stable-diffusion/mca/cache_paths/all-data-mca.json
         normalization: True
         random_angle: True
 
@@ -136,5 +136,5 @@ lightning:
     #profiler: pytorch
     #limit_train_batches: 100
     #limit_val_batches: 1
-    resume_from_checkpoint: /proj/aicell/data/stable-diffusion/mca/logs/ldm-v1-round4-2024-04-19T15-48-43_mca_debug/checkpoints/epoch=000000-v1.ckpt
+    #resume_from_checkpoint: /proj/aicell/data/stable-diffusion/mca/checkpoints/weights_ldm.ckpt
     

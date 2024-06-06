@@ -14,4 +14,4 @@ module load Mambaforge/23.3.1-1-hpc1-bdist
 mamba activate ldm2
 
 
-python /proj/aicell/users/x_emmku/stable-diffusion/main.py -t -b /proj/aicell/users/x_emmku/stable-diffusion/configs/autoencoder/autoencoder_vq_f4_mca_data.yaml -l /proj/aicell/data/stable-diffusion/mca --gpus=0,1,2,3
+python /proj/aicell/users/x_emmku/stable-diffusion/main.py -t -b /proj/aicell/users/x_emmku/stable-diffusion/mca/models/autoencoder_vq_f4_mca.yaml -l /proj/aicell/data/stable-diffusion/mca --gpus=0,1,2,3
