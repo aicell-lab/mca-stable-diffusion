@@ -1,7 +1,16 @@
 
 # Mitotic Cell Atlas Stable Diffusion
 
-**IMPORTANT: model checkpoints are too large for GitHub. Checkpoints for the autoencoder and the LDM are stored on Berzelius**
+## Download model weights and data
+
+### Mitotic Cell Atlas dataset
+The mitotic cell atlas dataset can be downloaded from: https://www.mitocheck.org/mitotic_cell_atlas/downloads/v1.0.1/ The entire dataset is 167 GB.
+
+
+### Pretrained model
+To sample from the trained LDM model, the model weights for the autoencoder and the entire latent diffusion model need to be downloaded from Zenodo: https://zenodo.org/records/11518277. 
+
+
 
 ## How to run
 Quick instructions of how to run. 
@@ -28,7 +37,7 @@ python main.py -t -b mca/models/mca_config.yaml -l path/to/logdir --gpus=0, --sc
 Generate 1000 images with guidance 1 and ddim steps 100 using the trained ldm. Change checkpoint and config to get new model.
 ````
 conda activate ldm2
-python mca_diffusion_sample.py --checkpoint=path/to/mca_ldm.ckpt --config=mca/models/mca_config.yaml --steps=100 --scale=1 -f single_random -k num_images=1000
+python mca_diffusion_sample.py --checkpoint=path/to/the/ckpt/from/zenodo.org --config=mca/models/mca_config.yaml --steps=100 --scale=1 -f single_random -k num_images=1000
 ````
 
 
@@ -61,7 +70,7 @@ General configs utilized sometime during the work. Look here for inspiration abo
 Contains code for the evaluation pipeline. Code is documented and described further how to use in evaluation/README.md.
 
 #### Models
-Configs for the autoencoder and ldm to use for training or sampling.  The `ckpt_path` needs to be changed for training. Note that the checkpoints are too large to store on GitHub. 
+Configs for the autoencoder and ldm to use for training or sampling.  The `ckpt_path` needs to be changed for training. Note that the model weights need to be downloaded separately from https://zenodo.org/records/11518277.
 
 ## Important files 
 
@@ -108,12 +117,12 @@ Script for sampling from the trained latent diffusion model. Can perform many di
 
 Generate 1000 images with guidance scale 1 and 100 DDIM steps. 
 ````
-python scripts/img_gen/mca_diffusion_sample.py --checkpoint=path/to/mca_ldm.ckpt --config=mca/models/mca_config.yaml --scale=1 --steps=100 -f single -k num_images=1000
+python scripts/img_gen/mca_diffusion_sample.py --checkpoint=path/to/weights_ldm.ckpt --config=mca/models/mca_config.yaml --scale=1 --steps=100 -f single -k num_images=1000
 ````
 
 Generate 100 images with the condition mst=5, z=14 and protein=CENPA with guidance scale 1 and 100 DDIM steps. All available proteins exist in protein_dict in mca.py. The ranges for mst are integers in [1, 20] and for z it is integers in [0, 30]. Example:
 ````
-python scripts/img_gen/mca_diffusion_sample.py --checkpoint=path/to/mca_ldm.ckpt --config=mca/models/mca_config.yaml --scale=1 --steps=100 -f conditions -k num_images=100 mst=5 z=14 protein_str=CENPA
+python scripts/img_gen/mca_diffusion_sample.py --checkpoint=path/to/weights_ldm.ckpt --config=mca/models/mca_config.yaml --scale=1 --steps=100 -f conditions -k num_images=100 mst=5 z=14 protein_str=CENPA
 ````
 
 There are many other functions to choose from in mca_diffusion_sample.py, but these are the main ones to generate images and the other functions are written for a specific purpose. File is found in mca-stable-diffusion/scripts/img_gen/mca_sample_diffusion.py
